@@ -1,0 +1,2690 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#072619" />
+  <title>台灣經典四人十三張（十三支）</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- PeerJS CDN (P2P Multiplayer with graceful local fallback) -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <!-- QRCodeJS CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+
+    :root {
+      --felt-center: #0e4a31;
+      --felt-mid: #093221;
+      --felt-edge: #041a11;
+      --gold-light: #f6dc8d;
+      --gold-main: #d4af37;
+      --gold-dark: #8c6d1f;
+
+      /* Dynamic Card Dimensions */
+      --hand-card-w: clamp(44px, 10.5vw, 68px);
+      --hand-card-h: clamp(64px, 15vw, 96px);
+      --hand-overlap: clamp(-20px, -4.2vw, -10px);
+
+      --lane-card-w: clamp(38px, 8.8vw, 58px);
+      --lane-card-h: clamp(54px, 12.5vw, 82px);
+      --lane-overlap: clamp(-14px, -2.5vw, -6px);
+
+      --mini-card-w: clamp(24px, 5vw, 36px);
+      --mini-card-h: clamp(34px, 7vw, 50px);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(ellipse at center, var(--felt-center) 0%, var(--felt-mid) 55%, var(--felt-edge) 100%);
+      color: #f8fafc;
+      touch-action: manipulation;
+    }
+
+    /* Subtle felt grain overlay */
+    .felt-bg {
+      background-image:
+        radial-gradient(ellipse at 50% 40%, rgba(20, 95, 62, 0.55) 0%, rgba(6, 34, 22, 0.92) 75%),
+        repeating-linear-gradient(45deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 2px, transparent 2px, transparent 6px);
+    }
+
+    .gold-border {
+      border: 1px solid rgba(212, 175, 55, 0.45);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(246, 220, 141, 0.2);
+    }
+
+    .gold-text {
+      background: linear-gradient(180deg, #fff3c4 0%, #e5be53 55%, #b88b22 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .btn-gold {
+      background: linear-gradient(180deg, #f0cb63 0%, #c99a26 100%);
+      color: #1a1203;
+      border: 1px solid #fae39c;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+      transition: transform 0.12s ease, filter 0.12s ease;
+    }
+    .btn-gold:hover:not(:disabled) { filter: brightness(1.08); }
+    .btn-gold:active:not(:disabled) { transform: scale(0.96); }
+    .btn-gold:disabled { opacity: 0.45; cursor: not-allowed; filter: grayscale(0.5); }
+
+    .btn-emerald {
+      background: linear-gradient(180deg, #166544 0%, #0d402b 100%);
+      color: #f8fafc;
+      border: 1px solid rgba(212, 175, 55, 0.4);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      transition: transform 0.12s ease, background 0.15s ease;
+    }
+    .btn-emerald:hover:not(:disabled) { background: linear-gradient(180deg, #1c7a52 0%, #115237 100%); }
+    .btn-emerald:active:not(:disabled) { transform: scale(0.96); }
+
+    /* Playing Cards */
+    .p-card {
+      position: relative;
+      background: linear-gradient(155deg, #ffffff 0%, #f4f3ee 100%);
+      border-radius: 7px;
+      border: 1px solid #cbd5e1;
+      box-shadow: -2px 2px 6px rgba(0, 0, 0, 0.42);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 3px 4px;
+      cursor: pointer;
+      transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.15s ease, border-color 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .p-card.red { color: #dc2626; }
+    .p-card.black { color: #18181b; }
+
+    .p-card.hand-card {
+      width: var(--hand-card-w);
+      height: var(--hand-card-h);
+      margin-left: var(--hand-overlap);
+    }
+    .p-card.hand-card:first-child { margin-left: 0; }
+    .p-card.hand-card:hover { transform: translateY(-6px); z-index: 20; }
+    .p-card.hand-card.selected {
+      transform: translateY(-16px);
+      border: 2px solid #f59e0b;
+      box-shadow: 0 8px 18px rgba(245, 158, 11, 0.45);
+      z-index: 30;
+    }
+
+    .p-card.lane-card {
+      width: var(--lane-card-w);
+      height: var(--lane-card-h);
+      margin-left: var(--lane-overlap);
+    }
+    .p-card.lane-card:first-child { margin-left: 0; }
+    .p-card.lane-card:hover { transform: translateY(-4px); z-index: 20; }
+
+    .p-card.mini-card {
+      width: var(--mini-card-w);
+      height: var(--mini-card-h);
+      margin-left: -8px;
+      border-radius: 4px;
+      padding: 1px 2px;
+      cursor: default;
+    }
+    .p-card.mini-card:first-child { margin-left: 0; }
+
+    .p-card-back {
+      background: repeating-linear-gradient(
+        135deg,
+        #7c1d24,
+        #7c1d24 4px,
+        #5e1319 4px,
+        #5e1319 8px
+      );
+      border: 1.5px solid #e5be53;
+    }
+
+    .lane-slot {
+      border: 1.5px dashed rgba(212, 175, 55, 0.42);
+      background: rgba(4, 24, 15, 0.55);
+      transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .lane-slot.can-drop {
+      border-color: #fbbf24;
+      background: rgba(212, 175, 55, 0.14);
+      box-shadow: 0 0 12px rgba(251, 191, 36, 0.25);
+      cursor: pointer;
+    }
+    .lane-slot.foul-lane {
+      border-color: #ef4444;
+      background: rgba(220, 38, 38, 0.18);
+    }
+
+    /* Dramatic Banner Animation */
+    @keyframes bannerPop {
+      0% { opacity: 0; transform: scale(0.7); }
+      18% { opacity: 1; transform: scale(1.04); }
+      82% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(0.95); }
+    }
+    .banner-pop {
+      animation: bannerPop 1.85s ease forwards;
+    }
+
+    /* Custom Scrollbar for modal body */
+    .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); border-radius: 99px; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: rgba(212, 175, 55, 0.5); border-radius: 99px; }
+
+    /* =====================================================================
+       MANDATORY: Landscape Short Screen Compact Mode
+       @media (orientation: landscape) and (max-height: 540px)
+       ===================================================================== */
+    @media (orientation: landscape) and (max-height: 540px) {
+      :root {
+        --hand-card-w: clamp(36px, 6.2vw, 52px);
+        --hand-card-h: clamp(50px, 11.5dvh, 72px);
+        --hand-overlap: clamp(-14px, -1.8vw, -6px);
+
+        --lane-card-w: clamp(32px, 5.2vw, 46px);
+        --lane-card-h: clamp(44px, 10dvh, 62px);
+        --lane-overlap: clamp(-12px, -1.5vw, -5px);
+
+        --mini-card-w: clamp(20px, 3.4vw, 28px);
+        --mini-card-h: clamp(28px, 6.8dvh, 38px);
+      }
+
+      .hide-on-short {
+        display: none !important;
+      }
+
+      .lobby-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 0.65rem !important;
+      }
+
+      .lobby-card {
+        padding: 0.65rem !important;
+      }
+
+      .compact-header {
+        padding-top: 0.2rem !important;
+        padding-bottom: 0.2rem !important;
+        min-height: 36px !important;
+      }
+
+      .compact-stage {
+        gap: 0.2rem !important;
+        padding-top: 0.15rem !important;
+        padding-bottom: 0.15rem !important;
+      }
+
+      .compact-lanes {
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 0.35rem !important;
+      }
+
+      .p-card.hand-card.selected {
+        transform: translateY(-10px);
+      }
+
+      #qr-container canvas, #qr-container img {
+        width: 72px !important;
+        height: 72px !important;
+      }
+    }
+  </style>
+</head>
+<body class="felt-bg flex flex-col h-[100dvh] w-full overflow-hidden">
+
+  <!-- ===================== TOAST CONTAINER (NO alert()) ===================== -->
+  <div id="toast-container" class="fixed top-14 left-1/2 -translate-x-1/2 z-[120] flex flex-col gap-2 pointer-events-none w-[90vw] max-w-sm items-center"></div>
+
+  <!-- ===================== DRAMATIC EFFECT OVERLAY ===================== -->
+  <div id="fx-overlay" class="fixed inset-0 z-[100] pointer-events-none flex items-center justify-center hidden">
+    <div id="fx-banner" class="px-8 py-4 rounded-2xl border-2 border-amber-300 bg-gradient-to-r from-red-900/95 via-amber-900/95 to-red-900/95 shadow-2xl text-center">
+      <div id="fx-title" class="text-3xl sm:text-5xl font-black gold-text tracking-wider drop-shadow"></div>
+      <div id="fx-sub" class="text-sm sm:text-lg font-bold text-amber-100 mt-1"></div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       SCREEN 1: LOBBY & WAITING ROOM
+       ========================================================================= -->
+  <div id="lobby-screen" class="flex flex-col h-[100dvh] w-full overflow-hidden">
+    <!-- Lobby Header -->
+    <header class="compact-header shrink-0 px-3 sm:px-6 py-2.5 bg-black/35 border-b border-amber-500/30 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-br from-amber-300 to-amber-600 flex items-center justify-center text-emerald-950 font-black text-base sm:text-lg shadow shrink-0">♠</div>
+        <div class="min-w-0">
+          <h1 class="text-base sm:text-xl font-black gold-text truncate leading-tight">台灣經典四人十三張</h1>
+          <p class="hide-on-short text-[11px] text-amber-200/75 truncate">十三支正宗規則・P2P 連線對戰・AI 大師陪打</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <span id="net-status-badge" class="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-900/80 border border-amber-400/30 text-amber-200">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span> 準備就緒
+        </span>
+        <button onclick="openRulesModal()" class="btn-emerald px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold" title="玩法規則">📖 規則</button>
+        <button onclick="openAudioModal()" class="btn-emerald px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold" title="音效與語音設定">🔊 音效</button>
+        <button onclick="toggleFullscreen()" class="btn-gold px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-black" title="切換全螢幕">⛶ 全螢幕</button>
+      </div>
+    </header>
+
+    <!-- Lobby Main Content (Scroll-free 2-col on desktop & landscape short screen) -->
+    <main class="flex-1 min-h-0 p-2.5 sm:p-5 flex items-center justify-center overflow-y-auto custom-scroll">
+      <div class="lobby-grid w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5 items-stretch">
+
+        <!-- Left Column: Player & Room Controls -->
+        <section class="lobby-card gold-border rounded-2xl bg-emerald-950/75 backdrop-blur-sm p-3.5 sm:p-5 flex flex-col justify-between gap-3">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <h2 class="text-sm sm:text-base font-black text-amber-300 flex items-center gap-1.5">🎴 玩家與對戰設定</h2>
+              <span id="mobile-net-badge" class="sm:hidden text-[11px] px-2 py-0.5 rounded-full bg-emerald-900 border border-amber-500/30 text-amber-200">就緒</span>
+            </div>
+
+            <!-- Nickname -->
+            <div>
+              <label class="block text-xs text-amber-100/80 mb-1">玩家暱稱</label>
+              <input id="player-name-input" type="text" maxlength="10" value="牌聖玩家"
+                class="w-full px-3 py-2 rounded-xl bg-black/40 border border-amber-500/40 text-white font-bold text-sm focus:outline-none focus:border-amber-300" />
+            </div>
+
+            <!-- AI Difficulty -->
+            <div>
+              <label class="block text-xs text-amber-100/80 mb-1">AI 電腦補位難度</label>
+              <div class="grid grid-cols-3 gap-1.5" id="ai-diff-group">
+                <button type="button" data-diff="easy" onclick="setAiDifficulty('easy')"
+                  class="ai-diff-btn py-1.5 rounded-xl text-xs font-bold border border-amber-500/30 bg-black/30 text-emerald-100">放水新手</button>
+                <button type="button" data-diff="normal" onclick="setAiDifficulty('normal')"
+                  class="ai-diff-btn py-1.5 rounded-xl text-xs font-bold border border-amber-400 bg-amber-500/25 text-amber-200">普通</button>
+                <button type="button" data-diff="master" onclick="setAiDifficulty('master')"
+                  class="ai-diff-btn py-1.5 rounded-xl text-xs font-bold border border-amber-500/30 bg-black/30 text-emerald-100">大師</button>
+              </div>
+            </div>
+
+            <!-- Room Create / Join -->
+            <div class="pt-1 border-t border-amber-500/20 space-y-2">
+              <div class="grid grid-cols-2 gap-2">
+                <button id="btn-create-room" onclick="createOnlineRoom()" class="btn-gold py-2.5 px-3 rounded-xl font-black text-xs sm:text-sm">
+                  🏠 建立連線房間
+                </button>
+                <button onclick="startQuickLocalGame()" class="btn-emerald py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm">
+                  ⚡ 立即單機開局
+                </button>
+              </div>
+
+              <div class="flex gap-1.5">
+                <input id="join-room-input" type="text" maxlength="8" placeholder="輸入房號加入 (例: 8821)"
+                  class="flex-1 min-w-0 px-3 py-2 rounded-xl bg-black/40 border border-amber-500/40 text-white text-xs sm:text-sm font-bold uppercase focus:outline-none focus:border-amber-300" />
+                <button id="btn-join-room" onclick="joinOnlineRoom()" class="btn-emerald px-3.5 py-2 rounded-xl font-bold text-xs sm:text-sm shrink-0">
+                  加入房間
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <p class="hide-on-short text-[11px] text-emerald-200/70 leading-relaxed">
+            支援 1~4 人 P2P 連線，空位自動由 AI 補滿。若處於無網路或沙盒環境，系統將自動無縫切換為本機單機 AI 模式。
+          </p>
+        </section>
+
+        <!-- Right Column: Waiting Room & Invite QR -->
+        <section class="lobby-card gold-border rounded-2xl bg-emerald-950/75 backdrop-blur-sm p-3.5 sm:p-5 flex flex-col justify-between gap-3">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="text-sm sm:text-base font-black text-amber-300">🪑 等待室座位 (1~4人)</h2>
+            <span id="room-code-display" class="px-2.5 py-0.5 rounded-lg bg-black/45 border border-amber-400/40 text-xs font-mono font-bold text-amber-200">
+              房號：單機預備
+            </span>
+          </div>
+
+          <!-- 4 Seats Grid -->
+          <div id="lobby-seats" class="grid grid-cols-2 gap-2">
+            <!-- Populated dynamically -->
+          </div>
+
+          <!-- Invite QR + Copy Link -->
+          <div id="invite-box" class="flex items-center gap-3 p-2.5 rounded-xl bg-black/35 border border-amber-500/25">
+            <div id="qr-container" class="w-20 h-20 bg-white rounded-lg p-1 flex items-center justify-center shrink-0 overflow-hidden">
+              <span class="text-[10px] text-slate-600 text-center font-bold leading-tight">建立房間<br/>生成 QR</span>
+            </div>
+            <div class="flex-1 min-w-0 space-y-1.5">
+              <div class="text-xs font-bold text-amber-200 truncate" id="invite-status-text">建立連線房後可邀請好友</div>
+              <div class="text-[11px] text-emerald-200/75 truncate font-mono" id="invite-url-preview">?room=------</div>
+              <button id="btn-copy-invite" onclick="copyInviteLink()" disabled
+                class="btn-emerald w-full py-1.5 px-2 rounded-lg text-xs font-bold disabled:opacity-40">
+                📋 複製邀請網址
+              </button>
+            </div>
+          </div>
+
+          <!-- Start Match Button -->
+          <button id="btn-start-match" onclick="hostStartGame()" class="btn-gold w-full py-2.5 sm:py-3 rounded-xl font-black text-sm sm:text-base tracking-wide">
+            🎴 開始發牌對戰
+          </button>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- =========================================================================
+       SCREEN 2: GAME TABLE
+       ========================================================================= -->
+  <div id="game-screen" class="hidden flex-col h-[100dvh] w-full overflow-hidden">
+
+    <!-- Top Game HUD Bar -->
+    <header class="compact-header shrink-0 px-2.5 sm:px-4 py-1.5 bg-black/45 border-b border-amber-500/30 flex items-center justify-between gap-2 z-20">
+      <div class="flex items-center gap-2 min-w-0">
+        <span id="hud-round" class="px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-400/50 text-amber-200 text-xs font-black shrink-0">第 1 局</span>
+        <span id="hud-room-tag" class="hidden sm:inline text-xs text-emerald-200/80 font-mono truncate">單機模式</span>
+        <span id="hud-my-score" class="px-2 py-0.5 rounded-md bg-emerald-900/80 border border-emerald-400/30 text-xs font-bold text-white shrink-0">
+          總水數：<strong class="text-amber-300">0</strong>
+        </span>
+      </div>
+
+      <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
+        <button onclick="openRulesModal()" class="btn-emerald px-2 py-1 rounded-lg text-xs font-bold">📖</button>
+        <button onclick="openAudioModal()" class="btn-emerald px-2 py-1 rounded-lg text-xs font-bold">🔊</button>
+        <button onclick="toggleFullscreen()" class="btn-gold px-2 py-1 rounded-lg text-xs font-black">⛶ 全螢幕</button>
+        <button onclick="leaveToLobby()" class="px-2 py-1 rounded-lg text-xs font-bold bg-red-900/80 hover:bg-red-800 border border-red-400/40 text-red-100">離開</button>
+      </div>
+    </header>
+
+    <!-- Main Game Stage -->
+    <main class="compact-stage flex-1 min-h-0 flex flex-col justify-between px-2 sm:px-4 py-1.5 gap-1.5 overflow-hidden">
+
+      <!-- TOP SECTION: 3 Opponents Strip -->
+      <section id="opponents-row" class="shrink-0 grid grid-cols-3 gap-1.5 sm:gap-3 w-full max-w-6xl mx-auto">
+        <!-- Rendered dynamically for Seats 1, 2, 3 (relative to local player) -->
+      </section>
+
+      <!-- CENTER ANTI-JITTER STATUS & TIMER BAR (Fixed Width/Height + animate-pulse ONLY) -->
+      <section class="shrink-0 flex items-center justify-center gap-2 my-0.5">
+        <div class="w-full max-w-xl h-8 sm:h-9 px-3 rounded-full bg-black/45 border border-amber-500/35 flex items-center justify-between gap-2 overflow-hidden">
+          <div class="flex items-center gap-2 min-w-0">
+            <span id="stage-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0"></span>
+            <span id="stage-status-text" class="text-xs sm:text-sm font-bold text-amber-100 truncate">請將 13 張牌分配至頭、中、尾三墩</span>
+          </div>
+          <!-- Fixed-width countdown pill (never jitters) -->
+          <div class="w-16 sm:w-20 h-6 rounded-full bg-emerald-950 border border-amber-400/40 flex items-center justify-center shrink-0">
+            <span id="timer-display" class="font-mono text-xs sm:text-sm font-black text-amber-300 animate-pulse">60s</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- MIDDLE SECTION: Player's 3 Lanes (Arrangement & Showdown) -->
+      <section id="player-lanes-section" class="flex-1 min-h-0 flex flex-col justify-center w-full max-w-5xl mx-auto gap-1.5 overflow-hidden">
+
+        <!-- Smart Suggestions & Special Hand Bar (Visible during arranging) -->
+        <div id="assist-bar" class="shrink-0 flex flex-wrap items-center justify-between gap-1.5 px-1">
+          <div class="flex items-center gap-1 overflow-x-auto custom-scroll py-0.5" id="suggestions-container">
+            <span class="text-[11px] text-amber-200/80 font-bold shrink-0">💡 推薦：</span>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button id="btn-special-declare" onclick="declareSpecialHand()" class="hidden px-3 py-1 rounded-full bg-gradient-to-r from-red-600 to-amber-500 border border-amber-200 text-white text-xs font-black shadow-lg animate-pulse">
+              🐉 立即報到！
+            </button>
+            <span id="foul-warning-badge" class="hidden px-2.5 py-0.5 rounded-full bg-red-600/90 border border-red-300 text-white text-xs font-black">
+              ⚠️ 倒水（相公）
+            </span>
+          </div>
+        </div>
+
+        <!-- 3 Lanes Container -->
+        <div class="compact-lanes flex-1 min-h-0 flex flex-col sm:grid sm:grid-cols-3 gap-1.5 sm:gap-2.5 items-stretch">
+          <!-- Front Lane (頭墩 3張) -->
+          <div id="lane-front" onclick="handleLaneClick('front')"
+            class="lane-slot rounded-xl p-1.5 sm:p-2 flex sm:flex-col items-center justify-between gap-1.5 min-h-0">
+            <div class="flex sm:w-full items-center justify-between gap-1 shrink-0">
+              <span class="text-xs font-black text-amber-300 whitespace-nowrap">頭墩 <span class="text-[10px] text-amber-100/70">(3張)</span></span>
+              <span id="rank-front" class="px-1.5 py-0.5 rounded bg-black/50 text-[10px] sm:text-xs font-bold text-emerald-200 whitespace-nowrap">未滿</span>
+            </div>
+            <div id="cards-front" class="flex-1 flex items-center justify-center min-h-[46px]"></div>
+            <div id="score-front" class="hidden text-xs font-black px-2 py-0.5 rounded-full bg-black/60"></div>
+          </div>
+
+          <!-- Middle Lane (中墩 5張) -->
+          <div id="lane-mid" onclick="handleLaneClick('mid')"
+            class="lane-slot rounded-xl p-1.5 sm:p-2 flex sm:flex-col items-center justify-between gap-1.5 min-h-0">
+            <div class="flex sm:w-full items-center justify-between gap-1 shrink-0">
+              <span class="text-xs font-black text-amber-300 whitespace-nowrap">中墩 <span class="text-[10px] text-amber-100/70">(5張)</span></span>
+              <span id="rank-mid" class="px-1.5 py-0.5 rounded bg-black/50 text-[10px] sm:text-xs font-bold text-emerald-200 whitespace-nowrap">未滿</span>
+            </div>
+            <div id="cards-mid" class="flex-1 flex items-center justify-center min-h-[46px]"></div>
+            <div id="score-mid" class="hidden text-xs font-black px-2 py-0.5 rounded-full bg-black/60"></div>
+          </div>
+
+          <!-- Back Lane (尾墩 5張) -->
+          <div id="lane-back" onclick="handleLaneClick('back')"
+            class="lane-slot rounded-xl p-1.5 sm:p-2 flex sm:flex-col items-center justify-between gap-1.5 min-h-0">
+            <div class="flex sm:w-full items-center justify-between gap-1 shrink-0">
+              <span class="text-xs font-black text-amber-300 whitespace-nowrap">尾墩 <span class="text-[10px] text-amber-100/70">(5張)</span></span>
+              <span id="rank-back" class="px-1.5 py-0.5 rounded bg-black/50 text-[10px] sm:text-xs font-bold text-emerald-200 whitespace-nowrap">未滿</span>
+            </div>
+            <div id="cards-back" class="flex-1 flex items-center justify-center min-h-[46px]"></div>
+            <div id="score-back" class="hidden text-xs font-black px-2 py-0.5 rounded-full bg-black/60"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BOTTOM SECTION: Hand Tray & Controls -->
+      <section id="hand-control-section" class="shrink-0 w-full max-w-5xl mx-auto flex flex-col gap-1.5 pb-0.5">
+        <!-- Action Buttons Row -->
+        <div id="arrange-actions" class="flex items-center justify-between gap-1.5 px-1">
+          <div class="flex items-center gap-1.5">
+            <button onclick="toggleHandSort()" id="btn-sort-hand" class="btn-emerald px-2.5 py-1.5 rounded-lg text-xs font-bold">
+              ⇅ 依點數
+            </button>
+            <button onclick="clearAllLanes()" class="btn-emerald px-2.5 py-1.5 rounded-lg text-xs font-bold">
+              ↺ 清空
+            </button>
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <span id="hand-count-hint" class="text-[11px] text-amber-100/80 font-bold hidden sm:inline">剩餘 13 張</span>
+            <button id="btn-confirm-hand" onclick="confirmPlayerArrangement()" disabled
+              class="btn-gold px-4 sm:px-6 py-1.5 rounded-xl text-xs sm:text-sm font-black">
+              ✔ 確認擺牌
+            </button>
+          </div>
+        </div>
+
+        <!-- Hand Cards Tray -->
+        <div id="hand-tray" class="w-full min-h-[58px] sm:min-h-[84px] flex items-end justify-center px-2 pt-2 pb-1 overflow-x-auto custom-scroll">
+          <!-- Interactive hand cards rendered here -->
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- =========================================================================
+       MODAL 1: 3-SECTION STICKY FOOTER SETTLEMENT MODAL (MANDATORY STRUCTURE)
+       ========================================================================= -->
+  <div id="settlement-modal" class="hidden fixed inset-0 z-[90] bg-black/75 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-4">
+    <div class="w-full max-w-2xl max-h-[92dvh] flex flex-col overflow-hidden rounded-2xl gold-border bg-emerald-950 shadow-2xl">
+      <!-- TOP: Fixed Header (shrink-0) -->
+      <div class="shrink-0 px-4 py-3 bg-gradient-to-r from-emerald-900 via-emerald-950 to-emerald-900 border-b border-amber-500/35 flex items-center justify-between">
+        <div>
+          <h3 id="settle-title" class="text-base sm:text-lg font-black gold-text">第 1 局 結算戰報</h3>
+          <p id="settle-subtitle" class="text-xs text-amber-200/80"></p>
+        </div>
+        <span id="settle-my-delta" class="px-3 py-1 rounded-full text-sm font-black bg-black/45 border border-amber-400/50"></span>
+      </div>
+
+      <!-- MIDDLE: Scrollable Scoreboard & Pairwise Details (flex-1 overflow-y-auto) -->
+      <div id="settle-body" class="flex-1 overflow-y-auto custom-scroll p-3.5 sm:p-4 space-y-3.5">
+        <!-- Populated dynamically -->
+      </div>
+
+      <!-- BOTTOM: Permanently Pinned Footer (shrink-0) -->
+      <div class="shrink-0 px-4 py-3 bg-black/45 border-t border-amber-500/35 flex items-center justify-end gap-2.5">
+        <button onclick="leaveToLobby()" class="btn-emerald px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold">
+          返回大廳
+        </button>
+        <button id="btn-next-round" onclick="startNextRound()" class="btn-gold flex-1 sm:flex-none sm:px-8 py-2.5 rounded-xl text-sm font-black">
+          確定 / 再來一局 🎴
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL 2: AUDIO & MEDIA ENGINE SETTINGS
+       ========================================================================= -->
+  <div id="audio-modal" class="hidden fixed inset-0 z-[95] bg-black/75 backdrop-blur-sm flex items-center justify-center p-3">
+    <div class="w-full max-w-md max-h-[92dvh] flex flex-col overflow-hidden rounded-2xl gold-border bg-emerald-950 shadow-2xl">
+      <div class="shrink-0 px-4 py-3 bg-black/35 border-b border-amber-500/30 flex items-center justify-between">
+        <h3 class="text-base font-black gold-text">🔊 音效、語音與背景音樂設定</h3>
+        <button onclick="closeAudioModal()" class="text-amber-200 hover:text-white text-lg font-bold px-2">✕</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto custom-scroll p-4 space-y-4 text-sm">
+        <!-- Master Mute -->
+        <div class="flex items-center justify-between p-2.5 rounded-xl bg-black/30 border border-amber-500/20">
+          <span class="font-bold text-amber-100">全域靜音開關</span>
+          <button id="btn-master-mute" onclick="audioEngine.toggleMute()" class="btn-emerald px-3 py-1 rounded-lg text-xs font-bold">
+            🔊 開啟中
+          </button>
+        </div>
+
+        <!-- BGM Control -->
+        <div class="space-y-2 p-3 rounded-xl bg-black/30 border border-amber-500/20">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-amber-200">🎵 背景音樂 (BGM)</span>
+            <button id="btn-bgm-toggle" onclick="audioEngine.toggleBgm()" class="btn-gold px-3 py-1 rounded-lg text-xs font-black">
+              ▶ 播放五聲音階
+            </button>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-emerald-200 w-10">音量</span>
+            <input id="slider-bgm" type="range" min="0" max="1" step="0.05" value="0.35"
+              oninput="audioEngine.setBgmVolume(this.value)" class="flex-1 accent-amber-400" />
+            <span id="val-bgm" class="text-xs font-mono w-9 text-right">35%</span>
+          </div>
+          <!-- Local Audio Import -->
+          <div class="pt-2 border-t border-amber-500/15 space-y-1.5">
+            <label class="block text-xs text-emerald-200/80">匯入本機音樂檔循環播放 (MP3 / WAV)：</label>
+            <div class="flex items-center gap-2">
+              <label class="btn-emerald px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer">
+                📂 選擇音樂檔
+                <input id="custom-bgm-file" type="file" accept="audio/mp3,audio/wav,audio/*" class="hidden" onchange="audioEngine.loadCustomBgm(this)" />
+              </label>
+              <span id="custom-bgm-name" class="text-xs text-amber-200/80 truncate flex-1">目前：內建東方五聲音階</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- SFX Control -->
+        <div class="space-y-2 p-3 rounded-xl bg-black/30 border border-amber-500/20">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-amber-200">✨ 遊戲合成音效 (SFX)</span>
+            <button onclick="audioEngine.playSfx('homerun')" class="btn-emerald px-2.5 py-1 rounded-lg text-xs font-bold">測試音效</button>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-emerald-200 w-10">音量</span>
+            <input id="slider-sfx" type="range" min="0" max="1" step="0.05" value="0.7"
+              oninput="audioEngine.setSfxVolume(this.value)" class="flex-1 accent-amber-400" />
+            <span id="val-sfx" class="text-xs font-mono w-9 text-right">70%</span>
+          </div>
+        </div>
+
+        <!-- Voice TTS Control -->
+        <div class="space-y-2 p-3 rounded-xl bg-black/30 border border-amber-500/20">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-amber-200">🗣️ 繁中語音播報 (TTS)</span>
+            <div class="flex gap-1.5">
+              <button id="btn-tts-toggle" onclick="audioEngine.toggleVoice()" class="btn-emerald px-2.5 py-1 rounded-lg text-xs font-bold">開啟</button>
+              <button onclick="audioEngine.speak('台灣經典十三張，祝您手氣大旺，全壘打！')" class="btn-emerald px-2.5 py-1 rounded-lg text-xs font-bold">試聽</button>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-emerald-200 w-10">音量</span>
+            <input id="slider-voice" type="range" min="0" max="1" step="0.05" value="0.9"
+              oninput="audioEngine.setVoiceVolume(this.value)" class="flex-1 accent-amber-400" />
+            <span id="val-voice" class="text-xs font-mono w-9 text-right">90%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="shrink-0 px-4 py-2.5 bg-black/40 border-t border-amber-500/30 flex justify-end">
+        <button onclick="closeAudioModal()" class="btn-gold px-6 py-2 rounded-xl text-sm font-black">完成設定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL 3: TAIWAN 13-CARDS RULES REFERENCE
+       ========================================================================= -->
+  <div id="rules-modal" class="hidden fixed inset-0 z-[95] bg-black/75 backdrop-blur-sm flex items-center justify-center p-3">
+    <div class="w-full max-w-lg max-h-[92dvh] flex flex-col overflow-hidden rounded-2xl gold-border bg-emerald-950 shadow-2xl">
+      <div class="shrink-0 px-4 py-3 bg-black/35 border-b border-amber-500/30 flex items-center justify-between">
+        <h3 class="text-base font-black gold-text">📖 台灣經典十三張（十三支）規則</h3>
+        <button onclick="closeRulesModal()" class="text-amber-200 hover:text-white text-lg font-bold px-2">✕</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto custom-scroll p-4 space-y-3 text-xs sm:text-sm text-emerald-100 leading-relaxed">
+        <div class="p-2.5 rounded-xl bg-black/30 border border-amber-500/20">
+          <div class="font-black text-amber-300 mb-1">1. 基本分墩與防倒水</div>
+          每人 13 張牌，分成 <strong>頭墩(3張)、中墩(5張)、尾墩(5張)</strong>。必須符合 <strong>尾墩 ≥ 中墩 ≥ 頭墩</strong>，否則為「<strong>倒水（相公）</strong>」，無條件輸給所有未倒水對手並以打槍倍數賠付。
+        </div>
+
+        <div class="p-2.5 rounded-xl bg-black/30 border border-amber-500/20">
+          <div class="font-black text-amber-300 mb-1">2. 牌型大小（只比點數不比花色）</div>
+          同花順 &gt; 鐵支 &gt; 葫蘆 &gt; 同花 &gt; 順子 &gt; 三條 &gt; 兩對 &gt; 一對 &gt; 烏龍。<br/>
+          點數 A 最大、2 最小，同點數平手（0 水）。順子以 <strong>10-J-Q-K-A</strong> 最大，<strong>A-2-3-4-5</strong> 第二大。
+        </div>
+
+        <div class="p-2.5 rounded-xl bg-black/30 border border-amber-500/20">
+          <div class="font-black text-amber-300 mb-1">3. 單墩加水、打槍與全壘打</div>
+          <ul class="list-disc pl-4 space-y-0.5">
+            <li><strong>頭墩三條（衝三）</strong>：3 水 ｜ <strong>中墩葫蘆</strong>：2 水</li>
+            <li><strong>尾墩鐵支</strong>：4 水 ｜ <strong>中墩鐵支</strong>：8 水</li>
+            <li><strong>尾墩同花順</strong>：5 水 ｜ <strong>中墩同花順</strong>：10 水</li>
+            <li><strong>打槍</strong>：三墩全贏同一位對手，對該對手總水數 <strong>×2</strong>。</li>
+            <li><strong>全壘打</strong>：打槍全部三位對手，總水數 <strong>再翻倍</strong>！</li>
+          </ul>
+        </div>
+
+        <div class="p-2.5 rounded-xl bg-black/30 border border-amber-500/20">
+          <div class="font-black text-amber-300 mb-1">4. 特殊報到牌型（免比牌直接贏）</div>
+          <ul class="list-disc pl-4 space-y-0.5">
+            <li><strong>至尊青龍</strong>（同花 A~K）：各收 26 水</li>
+            <li><strong>一條龍</strong>（雜色 A~K）：各收 13 水</li>
+            <li><strong>三同花 / 三順子 / 六對半</strong>：各收 3 水</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="shrink-0 px-4 py-2.5 bg-black/40 border-t border-amber-500/30 flex justify-end">
+        <button onclick="closeRulesModal()" class="btn-gold px-6 py-2 rounded-xl text-sm font-black">我知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       JAVASCRIPT ENGINE: AudioMediaEngine + Poker Evaluator + AI + PeerJS + UI
+       ========================================================================= -->
+  <script>
+    'use strict';
+
+    /* =========================================================================
+       1. UTILITIES & UI HELPERS (Toast, Fullscreen, Modals)
+       ========================================================================= */
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const el = document.createElement('div');
+      const colors = {
+        info: 'bg-emerald-900/95 border-amber-400/70 text-amber-100',
+        success: 'bg-emerald-800/95 border-emerald-300 text-white',
+        warn: 'bg-amber-900/95 border-amber-300 text-amber-100',
+        error: 'bg-red-900/95 border-red-400 text-red-100'
+      };
+      el.className = `px-4 py-2 rounded-xl border text-xs sm:text-sm font-bold shadow-xl transition-all duration-300 ${colors[type] || colors.info}`;
+      el.textContent = msg;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(-8px)';
+        setTimeout(() => el.remove(), 300);
+      }, 2600);
+    }
+
+    function showDramaticBanner(title, sub = '') {
+      const overlay = document.getElementById('fx-overlay');
+      const banner = document.getElementById('fx-banner');
+      document.getElementById('fx-title').textContent = title;
+      document.getElementById('fx-sub').textContent = sub;
+      overlay.classList.remove('hidden');
+      banner.classList.remove('banner-pop');
+      void banner.offsetWidth; // trigger reflow
+      banner.classList.add('banner-pop');
+      setTimeout(() => overlay.classList.add('hidden'), 1850);
+    }
+
+    function toggleFullscreen() {
+      try {
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+          const el = document.documentElement;
+          if (el.requestFullscreen) el.requestFullscreen();
+          else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        } else {
+          if (document.exitFullscreen) document.exitFullscreen();
+          else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        }
+      } catch (e) {
+        showToast('目前瀏覽器不支援自動全螢幕，可加入主畫面體驗滿版', 'warn');
+      }
+    }
+
+    function openAudioModal() { document.getElementById('audio-modal').classList.remove('hidden'); }
+    function closeAudioModal() { document.getElementById('audio-modal').classList.add('hidden'); }
+    function openRulesModal() { document.getElementById('rules-modal').classList.remove('hidden'); }
+    function closeRulesModal() { document.getElementById('rules-modal').classList.add('hidden'); }
+
+    /* =========================================================================
+       2. AudioMediaEngine: Web Speech TTS + Web Audio SFX + Pentatonic BGM + Local MP3/WAV
+       ========================================================================= */
+    class AudioMediaEngine {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+        this.bgmVol = 0.35;
+        this.sfxVol = 0.70;
+        this.voiceVol = 0.90;
+        this.voiceEnabled = true;
+
+        this.bgmPlaying = false;
+        this.bgmTimer = null;
+        this.bgmStep = 0;
+
+        this.customAudio = new Audio();
+        this.customAudio.loop = true;
+        this.useCustomBgm = false;
+
+        // Eastern Pentatonic Scale (C4, D4, E4, G4, A4, C5, D5, E5, G5)
+        this.pentatonic = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99];
+        this.melodyPattern = [0, 2, 3, 5, 4, 3, 2, 1, 0, 3, 4, 6, 5, 4, 3, 2];
+      }
+
+      ensureContext() {
+        if (!this.ctx) {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (AC) this.ctx = new AC();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume().catch(() => {});
+        }
+      }
+
+      toggleMute() {
+        this.muted = !this.muted;
+        const btn = document.getElementById('btn-master-mute');
+        btn.textContent = this.muted ? '🔇 已靜音' : '🔊 開啟中';
+        this.customAudio.muted = this.muted;
+        if (this.muted && window.speechSynthesis) {
+          window.speechSynthesis.cancel();
+        }
+      }
+
+      setBgmVolume(v) {
+        this.bgmVol = parseFloat(v);
+        document.getElementById('val-bgm').textContent = Math.round(this.bgmVol * 100) + '%';
+        this.customAudio.volume = this.bgmVol;
+      }
+
+      setSfxVolume(v) {
+        this.sfxVol = parseFloat(v);
+        document.getElementById('val-sfx').textContent = Math.round(this.sfxVol * 100) + '%';
+      }
+
+      setVoiceVolume(v) {
+        this.voiceVol = parseFloat(v);
+        document.getElementById('val-voice').textContent = Math.round(this.voiceVol * 100) + '%';
+      }
+
+      toggleVoice() {
+        this.voiceEnabled = !this.voiceEnabled;
+        document.getElementById('btn-tts-toggle').textContent = this.voiceEnabled ? '開啟' : '關閉';
+        if (!this.voiceEnabled && window.speechSynthesis) window.speechSynthesis.cancel();
+      }
+
+      loadCustomBgm(inputEl) {
+        const file = inputEl.files && inputEl.files[0];
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        this.customAudio.src = url;
+        this.customAudio.volume = this.bgmVol;
+        this.customAudio.muted = this.muted;
+        this.useCustomBgm = true;
+        document.getElementById('custom-bgm-name').textContent = `目前：${file.name}`;
+        if (this.bgmPlaying) {
+          this.stopPentatonicLoop();
+          this.customAudio.play().catch(() => {});
+        } else {
+          this.toggleBgm();
+        }
+        showToast(`已載入本機音樂：${file.name}`, 'success');
+      }
+
+      toggleBgm() {
+        this.ensureContext();
+        this.bgmPlaying = !this.bgmPlaying;
+        const btn = document.getElementById('btn-bgm-toggle');
+        if (this.bgmPlaying) {
+          btn.textContent = '⏸ 暫停音樂';
+          if (this.useCustomBgm) {
+            this.customAudio.volume = this.bgmVol;
+            this.customAudio.muted = this.muted;
+            this.customAudio.play().catch(() => {});
+          } else {
+            this.startPentatonicLoop();
+          }
+        } else {
+          btn.textContent = this.useCustomBgm ? '▶ 播放本機音樂' : '▶ 播放五聲音階';
+          this.stopPentatonicLoop();
+          this.customAudio.pause();
+        }
+      }
+
+      startPentatonicLoop() {
+        this.stopPentatonicLoop();
+        const playNote = () => {
+          if (!this.bgmPlaying || this.useCustomBgm) return;
+          if (!this.muted && this.bgmVol > 0 && this.ctx) {
+            const idx = this.melodyPattern[this.bgmStep % this.melodyPattern.length];
+            const freq = this.pentatonic[idx];
+            const now = this.ctx.currentTime;
+
+            // Plucked Guzheng-like tone
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now);
+
+            const peak = this.bgmVol * 0.16;
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.linearRampToValueAtTime(peak, now + 0.03);
+            gain.gain.exponentialRampToValueAtTime(0.0008, now + 1.15);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 1.2);
+          }
+          this.bgmStep++;
+          this.bgmTimer = setTimeout(playNote, 620);
+        };
+        playNote();
+      }
+
+      stopPentatonicLoop() {
+        if (this.bgmTimer) {
+          clearTimeout(this.bgmTimer);
+          this.bgmTimer = null;
+        }
+      }
+
+      playSfx(type) {
+        if (this.muted || this.sfxVol <= 0) return;
+        this.ensureContext();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        const vol = this.sfxVol * 0.35;
+
+        try {
+          if (type === 'select') {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(660, now);
+            osc.frequency.exponentialRampToValueAtTime(880, now + 0.05);
+            g.gain.setValueAtTime(vol * 0.6, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+            osc.connect(g); g.connect(this.ctx.destination);
+            osc.start(now); osc.stop(now + 0.07);
+          } else if (type === 'place' || type === 'deal') {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(type === 'deal' ? 320 : 420, now);
+            osc.frequency.exponentialRampToValueAtTime(140, now + 0.07);
+            g.gain.setValueAtTime(vol * 0.8, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+            osc.connect(g); g.connect(this.ctx.destination);
+            osc.start(now); osc.stop(now + 0.09);
+          } else if (type === 'lock') {
+            [523.25, 659.25, 783.99].forEach((f, i) => {
+              const osc = this.ctx.createOscillator();
+              const g = this.ctx.createGain();
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(f, now + i * 0.06);
+              g.gain.setValueAtTime(vol * 0.6, now + i * 0.06);
+              g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.18);
+              osc.connect(g); g.connect(this.ctx.destination);
+              osc.start(now + i * 0.06); osc.stop(now + i * 0.06 + 0.2);
+            });
+          } else if (type === 'reveal') {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(300, now);
+            osc.frequency.exponentialRampToValueAtTime(620, now + 0.14);
+            g.gain.setValueAtTime(vol * 0.7, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(g); g.connect(this.ctx.destination);
+            osc.start(now); osc.stop(now + 0.17);
+          } else if (type === 'shoot') {
+            // Dramatic gunshot impact burst
+            const bufferSize = this.ctx.sampleRate * 0.18;
+            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+              data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.04));
+            }
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = buffer;
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(1100, now);
+            const g = this.ctx.createGain();
+            g.gain.setValueAtTime(vol * 1.4, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+            noise.connect(filter); filter.connect(g); g.connect(this.ctx.destination);
+            noise.start(now);
+          } else if (type === 'homerun' || type === 'win') {
+            const notes = [523.25, 659.25, 783.99, 1046.5];
+            notes.forEach((f, i) => {
+              const osc = this.ctx.createOscillator();
+              const g = this.ctx.createGain();
+              osc.type = 'triangle';
+              osc.frequency.setValueAtTime(f, now + i * 0.09);
+              g.gain.setValueAtTime(vol * 0.9, now + i * 0.09);
+              g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.09 + 0.35);
+              osc.connect(g); g.connect(this.ctx.destination);
+              osc.start(now + i * 0.09); osc.stop(now + i * 0.09 + 0.38);
+            });
+          } else if (type === 'foul') {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(200, now);
+            osc.frequency.linearRampToValueAtTime(120, now + 0.25);
+            g.gain.setValueAtTime(vol * 0.5, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+            osc.connect(g); g.connect(this.ctx.destination);
+            osc.start(now); osc.stop(now + 0.3);
+          }
+        } catch (e) {}
+      }
+
+      speak(text) {
+        if (this.muted || !this.voiceEnabled || this.voiceVol <= 0) return;
+        if (!('speechSynthesis' in window)) return;
+        try {
+          window.speechSynthesis.cancel();
+          const utter = new SpeechSynthesisUtterance(text);
+          utter.lang = 'zh-TW';
+          utter.volume = this.voiceVol;
+          utter.rate = 1.08;
+          utter.pitch = 1.02;
+          const voices = window.speechSynthesis.getVoices();
+          const twVoice = voices.find(v => v.lang.includes('zh-TW') || v.lang.includes('zh_TW'))
+            || voices.find(v => v.lang.includes('zh'));
+          if (twVoice) utter.voice = twVoice;
+          window.speechSynthesis.speak(utter);
+        } catch (e) {}
+      }
+    }
+
+    const audioEngine = new AudioMediaEngine();
+
+    /* =========================================================================
+       3. TAIWAN THIRTEEN CARDS (十三張) CORE ENGINE & EVALUATOR
+       ========================================================================= */
+    const SUITS = ['♠', '♥', '♣', '♦'];
+    const SUIT_COLORS = ['black', 'red', 'black', 'red'];
+    const RANK_LABELS = {
+      2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8',
+      9: '9', 10: '10', 11: 'J', 12: 'Q', 13: 'K', 14: 'A'
+    };
+
+    const HAND_NAMES = [
+      '烏龍', '一對', '兩對', '三條', '順子', '同花', '葫蘆', '鐵支', '同花順'
+    ];
+
+    function createDeck() {
+      const deck = [];
+      let id = 0;
+      for (let s = 0; s < 4; s++) {
+        for (let r = 2; r <= 14; r++) {
+          deck.push({ id: id++, suit: s, rank: r });
+        }
+      }
+      // Fisher-Yates Shuffle
+      for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+      }
+      return deck;
+    }
+
+    /**
+     * Evaluate a 5-card hand (Taiwan Rules: rank-only comparison;
+     * Straight: 10-J-Q-K-A = 28 (largest), A-2-3-4-5 = 27 (2nd largest), K-high = 26...
+     */
+    function eval5(cards) {
+      if (!cards || cards.length !== 5) return null;
+      const ranks = cards.map(c => c.rank).sort((a, b) => b - a);
+      const isFlush = cards.every(c => c.suit === cards[0].suit);
+
+      // Frequency count
+      const counts = {};
+      for (const r of ranks) counts[r] = (counts[r] || 0) + 1;
+      const groups = Object.entries(counts)
+        .map(([r, cnt]) => ({ rank: Number(r), cnt }))
+        .sort((a, b) => b.cnt - a.cnt || b.rank - a.rank);
+
+      // Straight detection (doubled scale so A-2-3-4-5 fits cleanly as 27 between 28 and 26)
+      let straightRank = 0;
+      if (groups.length === 5) {
+        if (ranks[0] - ranks[4] === 4) {
+          straightRank = ranks[0] * 2; // 10-J-Q-K-A => 28, K-high => 26, ..., 6-high => 12
+        } else if (ranks[0] === 14 && ranks[1] === 5 && ranks[2] === 4 && ranks[3] === 3 && ranks[4] === 2) {
+          straightRank = 27; // Taiwan mainstream: A-2-3-4-5 is 2nd largest straight
+        }
+      }
+
+      let type = 0;
+      let tb = [];
+
+      if (isFlush && straightRank > 0) {
+        type = 8; // 同花順
+        tb = [straightRank, 0, 0, 0, 0];
+      } else if (groups[0].cnt === 4) {
+        type = 7; // 鐵支
+        tb = [groups[0].rank, groups[1].rank, 0, 0, 0];
+      } else if (groups[0].cnt === 3 && groups[1].cnt === 2) {
+        type = 6; // 葫蘆
+        tb = [groups[0].rank, groups[1].rank, 0, 0, 0];
+      } else if (isFlush) {
+        type = 5; // 同花
+        tb = ranks;
+      } else if (straightRank > 0) {
+        type = 4; // 順子
+        tb = [straightRank, 0, 0, 0, 0];
+      } else if (groups[0].cnt === 3) {
+        type = 3; // 三條
+        tb = [groups[0].rank, groups[1].rank, groups[2].rank, 0, 0];
+      } else if (groups[0].cnt === 2 && groups[1].cnt === 2) {
+        type = 2; // 兩對
+        tb = [groups[0].rank, groups[1].rank, groups[2].rank, 0, 0];
+      } else if (groups[0].cnt === 2) {
+        type = 1; // 一對
+        tb = [groups[0].rank, groups[1].rank, groups[2].rank, groups[3].rank, 0];
+      } else {
+        type = 0; // 烏龍
+        tb = ranks;
+      }
+
+      const score = type * 1e10 + tb[0] * 1e8 + tb[1] * 1e6 + tb[2] * 1e4 + tb[3] * 1e2 + tb[4];
+      return { type, name: HAND_NAMES[type], tiebreakers: tb, score };
+    }
+
+    /**
+     * Evaluate a 3-card Front hand (Head lane).
+     * Uses identical score scale as eval5 so direct comparison (mid.score >= front.score) is exact.
+     */
+    function eval3(cards) {
+      if (!cards || cards.length !== 3) return null;
+      const ranks = cards.map(c => c.rank).sort((a, b) => b - a);
+      const counts = {};
+      for (const r of ranks) counts[r] = (counts[r] || 0) + 1;
+      const groups = Object.entries(counts)
+        .map(([r, cnt]) => ({ rank: Number(r), cnt }))
+        .sort((a, b) => b.cnt - a.cnt || b.rank - a.rank);
+
+      let type = 0;
+      let tb = [];
+      if (groups[0].cnt === 3) {
+        type = 3; // 衝三
+        tb = [groups[0].rank, 0, 0, 0, 0];
+      } else if (groups[0].cnt === 2) {
+        type = 1; // 一對
+        tb = [groups[0].rank, groups[1].rank, 0, 0, 0];
+      } else {
+        type = 0; // 烏龍
+        tb = [ranks[0], ranks[1], ranks[2], 0, 0];
+      }
+
+      const score = type * 1e10 + tb[0] * 1e8 + tb[1] * 1e6 + tb[2] * 1e4 + tb[3] * 1e2 + tb[4];
+      const name = type === 3 ? '衝三(三條)' : HAND_NAMES[type];
+      return { type, name, tiebreakers: tb, score };
+    }
+
+    /**
+     * Lane Bonus Water (單墩加水) according to Taiwan mainstream rules
+     */
+    function getLaneWinShui(lane, evalObj) {
+      if (!evalObj) return 1;
+      if (lane === 'front') {
+        if (evalObj.type === 3) return 3; // 頭墩三條（衝三）3水
+        return 1;
+      }
+      if (lane === 'mid') {
+        if (evalObj.type === 8) return 10; // 中墩同花順 10水
+        if (evalObj.type === 7) return 8;  // 中墩鐵支 8水
+        if (evalObj.type === 6) return 2;  // 中墩葫蘆 2水
+        return 1;
+      }
+      if (lane === 'back') {
+        if (evalObj.type === 8) return 5;  // 尾墩同花順 5水
+        if (evalObj.type === 7) return 4;  // 尾墩鐵支 4水
+        return 1;
+      }
+      return 1;
+    }
+
+    /**
+     * Check if 13 cards qualify for Special Instant-Win Hand (報到牌型)
+     */
+    function detectSpecialHand(cards13) {
+      if (!cards13 || cards13.length !== 13) return null;
+      const rankCounts = new Array(15).fill(0);
+      const suitCounts = [0, 0, 0, 0];
+      for (const c of cards13) {
+        rankCounts[c.rank]++;
+        suitCounts[c.suit]++;
+      }
+
+      // 1. 至尊青龍 (+26): All 13 ranks + same suit
+      let allUniqueRanks = true;
+      for (let r = 2; r <= 14; r++) {
+        if (rankCounts[r] !== 1) { allUniqueRanks = false; break; }
+      }
+      if (allUniqueRanks) {
+        if (suitCounts.some(cnt => cnt === 13)) {
+          return { code: 'royal_dragon', name: '至尊青龍', shui: 26, priority: 5 };
+        }
+        // 2. 一條龍 (+13)
+        return { code: 'dragon', name: '一條龍', shui: 13, priority: 4 };
+      }
+
+      // 3. 六對半 (+3): 6 pairs + 1 single (4-of-a-kind counts as 2 pairs)
+      let pairTotal = 0;
+      for (let r = 2; r <= 14; r++) pairTotal += Math.floor(rankCounts[r] / 2);
+      if (pairTotal === 6) {
+        return { code: 'six_pairs', name: '六對半', shui: 3, priority: 3 };
+      }
+
+      // 4. 三同花 (+3): Suits can partition into 5, 5, 3
+      const nonZeroSuits = suitCounts.filter(c => c > 0).sort((a, b) => b - a);
+      const isThreeFlush =
+        (nonZeroSuits.length === 1 && nonZeroSuits[0] === 13) ||
+        (nonZeroSuits.length === 2 && ((nonZeroSuits[0] === 10 && nonZeroSuits[1] === 3) || (nonZeroSuits[0] === 8 && nonZeroSuits[1] === 5))) ||
+        (nonZeroSuits.length === 3 && nonZeroSuits[0] === 5 && nonZeroSuits[1] === 5 && nonZeroSuits[2] === 3);
+      if (isThreeFlush) {
+        return { code: 'three_flush', name: '三同花', shui: 3, priority: 2 };
+      }
+
+      // 5. 三順子 (+3): Backtracking search for 5-straight + 5-straight + 3-straight
+      if (canPartitionThreeStraights(rankCounts.slice())) {
+        return { code: 'three_straight', name: '三順子', shui: 3, priority: 1 };
+      }
+
+      return null;
+    }
+
+    function canPartitionThreeStraights(counts) {
+      // Build all valid 5-card straights (ranks 2..14; A-2-3-4-5 = [14,2,3,4,5])
+      const straights5 = [[14, 2, 3, 4, 5]];
+      for (let s = 2; s <= 10; s++) straights5.push([s, s + 1, s + 2, s + 3, s + 4]);
+
+      const straights3 = [[14, 2, 3]];
+      for (let s = 2; s <= 12; s++) straights3.push([s, s + 1, s + 2]);
+
+      const hasSeq = (arr, seq) => seq.every(r => arr[r] > 0);
+      const subSeq = (arr, seq) => seq.forEach(r => arr[r]--);
+      const addSeq = (arr, seq) => seq.forEach(r => arr[r]++);
+
+      for (let i = 0; i < straights5.length; i++) {
+        if (!hasSeq(counts, straights5[i])) continue;
+        subSeq(counts, straights5[i]);
+        for (let j = i; j < straights5.length; j++) {
+          if (!hasSeq(counts, straights5[j])) continue;
+          subSeq(counts, straights5[j]);
+          for (let k = 0; k < straights3.length; k++) {
+            if (hasSeq(counts, straights3[k])) {
+              return true;
+            }
+          }
+          addSeq(counts, straights5[j]);
+        }
+        addSeq(counts, straights5[i]);
+      }
+      return false;
+    }
+
+    /**
+     * Fast Heuristic Solver: Finds diverse top legal arrangements (< 8ms on mobile)
+     * Used for both Player Recommendations (2-3 distinct choices) & AI (Easy / Normal / Master)
+     */
+    function findBestArrangements(cards13) {
+      const n = 13;
+      const combos5 = [];
+
+      // Enumerate all C(13,5) = 1287 5-card combinations
+      for (let a = 0; a < n - 4; a++) {
+        for (let b = a + 1; b < n - 3; b++) {
+          for (let c = b + 1; c < n - 2; c++) {
+            for (let d = c + 1; d < n - 1; d++) {
+              for (let e = d + 1; e < n; e++) {
+                const sub = [cards13[a], cards13[b], cards13[c], cards13[d], cards13[e]];
+                const ev = eval5(sub);
+                const mask = (1 << a) | (1 << b) | (1 << c) | (1 << d) | (1 << e);
+                combos5.push({ indices: [a, b, c, d, e], mask, ev });
+              }
+            }
+          }
+        }
+      }
+
+      // Sort descending by hand strength
+      combos5.sort((x, y) => y.ev.score - x.ev.score);
+
+      // Select diverse Back-lane candidates (top 28 overall + top 3 of each hand type)
+      const backCandidates = [];
+      const seenMask = new Set();
+      const typeCounts = new Array(9).fill(0);
+
+      for (const item of combos5) {
+        if (backCandidates.length < 26) {
+          backCandidates.push(item);
+          seenMask.add(item.mask);
+          typeCounts[item.ev.type]++;
+        } else if (typeCounts[item.ev.type] < 4 && backCandidates.length < 44) {
+          if (!seenMask.has(item.mask)) {
+            backCandidates.push(item);
+            seenMask.add(item.mask);
+            typeCounts[item.ev.type]++;
+          }
+        }
+      }
+
+      // Evaluate all C(8,5) = 56 middle splits for each Back candidate
+      const validSolutions = [];
+      for (const backItem of backCandidates) {
+        const remIdx = [];
+        for (let i = 0; i < n; i++) {
+          if ((backItem.mask & (1 << i)) === 0) remIdx.push(i);
+        }
+
+        // Choose 3 of 8 for Front (C(8,3) = 56), remaining 5 for Mid
+        for (let i = 0; i < 6; i++) {
+          for (let j = i + 1; j < 7; j++) {
+            for (let k = j + 1; k < 8; k++) {
+              const fIdx = [remIdx[i], remIdx[j], remIdx[k]];
+              const mIdx = [];
+              for (let x = 0; x < 8; x++) {
+                if (x !== i && x !== j && x !== k) mIdx.push(remIdx[x]);
+              }
+
+              const fCards = fIdx.map(idx => cards13[idx]);
+              const mCards = mIdx.map(idx => cards13[idx]);
+              const fEv = eval3(fCards);
+              const mEv = eval5(mCards);
+
+              // Enforce Taiwan rule: Back >= Mid >= Front
+              if (backItem.ev.score >= mEv.score && mEv.score >= fEv.score) {
+                const bEv = backItem.ev;
+                // Expected Shui heuristic (strongly values lane bonuses + balanced strength)
+                const hFront =
+                  (fEv.type === 3 ? 28 + fEv.tiebreakers[0] * 0.4 :
+                   fEv.type === 1 ? 8 + fEv.tiebreakers[0] * 0.7 :
+                   fEv.tiebreakers[0] * 0.28);
+                const hMid =
+                  (mEv.type === 8 ? 70 :
+                   mEv.type === 7 ? 56 :
+                   mEv.type === 6 ? 26 + mEv.tiebreakers[0] * 0.3 :
+                   mEv.type * 4.2 + mEv.tiebreakers[0] * 0.25);
+                const hBack =
+                  (bEv.type === 8 ? 40 :
+                   bEv.type === 7 ? 32 :
+                   bEv.type * 3.1 + bEv.tiebreakers[0] * 0.2);
+
+                const rating = hFront + hMid + hBack;
+                validSolutions.push({
+                  front: fCards,
+                  mid: mCards,
+                  back: backItem.indices.map(idx => cards13[idx]),
+                  fEv, mEv, bEv,
+                  rating,
+                  sig: `${fEv.type}-${mEv.type}-${bEv.type}`
+                });
+              }
+            }
+          }
+        }
+      }
+
+      validSolutions.sort((a, b) => b.rating - a.rating);
+
+      // Pick top 3 distinct strategic arrangements
+      const diverse = [];
+      const usedSig = new Set();
+      for (const sol of validSolutions) {
+        if (!usedSig.has(sol.sig)) {
+          usedSig.add(sol.sig);
+          diverse.push(sol);
+          if (diverse.length === 3) break;
+        }
+      }
+      // If fewer than 3 distinct signatures, fill with next top solutions
+      for (const sol of validSolutions) {
+        if (diverse.length >= 3) break;
+        if (!diverse.includes(sol)) diverse.push(sol);
+      }
+
+      return { bestList: diverse, allValid: validSolutions };
+    }
+
+    function computeAiArrangement(cards13, difficulty) {
+      const special = detectSpecialHand(cards13);
+      if (special && difficulty !== 'easy') {
+        return {
+          front: cards13.slice(0, 3),
+          mid: cards13.slice(3, 8),
+          back: cards13.slice(8, 13),
+          isSpecial: true,
+          special
+        };
+      }
+
+      const { bestList, allValid } = findBestArrangements(cards13);
+      if (allValid.length === 0) {
+        // Failsafe
+        return {
+          front: cards13.slice(0, 3),
+          mid: cards13.slice(3, 8),
+          back: cards13.slice(8, 13),
+          isSpecial: false,
+          special: null
+        };
+      }
+
+      let chosen;
+      if (difficulty === 'master') {
+        chosen = bestList[0];
+      } else if (difficulty === 'normal') {
+        const pool = bestList.length > 1 ? bestList.slice(0, Math.min(3, bestList.length)) : [bestList[0]];
+        chosen = pool[Math.floor(Math.random() * pool.length)];
+      } else {
+        // Easy: pick from lower half of legal hands
+        const start = Math.floor(allValid.length * 0.55);
+        const idx = start + Math.floor(Math.random() * Math.max(1, allValid.length - start));
+        chosen = allValid[idx] || allValid[allValid.length - 1];
+      }
+
+      return {
+        front: chosen.front,
+        mid: chosen.mid,
+        back: chosen.back,
+        isSpecial: false,
+        special: null
+      };
+    }
+
+    /* =========================================================================
+       4. PAIRWISE SCORING ENGINE (Taiwan Rules: Bonuses, Foul, Shoot, Home Run)
+       ========================================================================= */
+    function evaluateRoundShowdown(submissions) {
+      // submissions: array of 4 items { seatIdx, name, front, mid, back, isSpecial, special }
+      const evals = submissions.map(sub => {
+        if (sub.isSpecial && sub.special) {
+          return { ...sub, isFoul: false, fEv: null, mEv: null, bEv: null };
+        }
+        const fEv = eval3(sub.front);
+        const mEv = eval5(sub.mid);
+        const bEv = eval5(sub.back);
+        const isFoul = !(bEv && mEv && fEv && bEv.score >= mEv.score && mEv.score >= fEv.score);
+        return { ...sub, fEv, mEv, bEv, isFoul };
+      });
+
+      const pairwise = []; // detailed comparisons between i and j (i < j)
+      const totalDelta = [0, 0, 0, 0];
+      const shootsGiven = [[], [], [], []]; // shootsGiven[i] = list of seatIdx shot by i
+      const homeRunSeats = [];
+
+      // Lane-by-lane raw net shui for display during reveal steps
+      const laneNet = {
+        front: [0, 0, 0, 0],
+        mid: [0, 0, 0, 0],
+        back: [0, 0, 0, 0]
+      };
+
+      for (let i = 0; i < 4; i++) {
+        for (let j = i + 1; j < 4; j++) {
+          const A = evals[i];
+          const B = evals[j];
+
+          // Case 1: One or both declared 報到 (Special)
+          if (A.isSpecial || B.isSpecial) {
+            let shuiA = 0;
+            let note = '';
+            if (A.isSpecial && B.isSpecial) {
+              if (A.special.priority > B.special.priority) {
+                shuiA = A.special.shui;
+                note = `${A.name} 報到(${A.special.name}) 壓制 ${B.special.name}`;
+              } else if (B.special.priority > A.special.priority) {
+                shuiA = -B.special.shui;
+                note = `${B.name} 報到(${B.special.name}) 壓制 ${A.special.name}`;
+              } else {
+                shuiA = 0;
+                note = `雙方同為報到平手`;
+              }
+            } else if (A.isSpecial) {
+              shuiA = A.special.shui;
+              note = `${A.name} 報到【${A.special.name}】`;
+            } else {
+              shuiA = -B.special.shui;
+              note = `${B.name} 報到【${B.special.name}】`;
+            }
+
+            totalDelta[i] += shuiA;
+            totalDelta[j] -= shuiA;
+            pairwise.push({
+              i, j, type: 'special', note,
+              fDiff: 0, mDiff: 0, bDiff: 0,
+              shotBy: null,
+              netA: shuiA
+            });
+            continue;
+          }
+
+          // Case 2: Both Foul (倒水)
+          if (A.isFoul && B.isFoul) {
+            pairwise.push({
+              i, j, type: 'foul_both', note: '雙方倒水平手',
+              fDiff: 0, mDiff: 0, bDiff: 0, shotBy: null, netA: 0
+            });
+            continue;
+          }
+
+          // Case 3: One Foul (倒水賠打槍 ×2)
+          if (A.isFoul || B.isFoul) {
+            const winner = A.isFoul ? B : A;
+            const wIdx = A.isFoul ? j : i;
+            const lIdx = A.isFoul ? i : j;
+            const fVal = getLaneWinShui('front', winner.fEv);
+            const mVal = getLaneWinShui('mid', winner.mEv);
+            const bVal = getLaneWinShui('back', winner.bEv);
+            const baseSum = fVal + mVal + bVal;
+            const totalWin = baseSum * 2; // 倒水以打槍倍數賠付
+
+            const sign = (wIdx === i) ? 1 : -1;
+            laneNet.front[wIdx] += fVal; laneNet.front[lIdx] -= fVal;
+            laneNet.mid[wIdx] += mVal; laneNet.mid[lIdx] -= mVal;
+            laneNet.back[wIdx] += bVal; laneNet.back[lIdx] -= bVal;
+
+            totalDelta[wIdx] += totalWin;
+            totalDelta[lIdx] -= totalWin;
+            shootsGiven[wIdx].push(lIdx);
+
+            pairwise.push({
+              i, j, type: 'foul',
+              note: `${evals[lIdx].name} 倒水相公（打槍 ×2）`,
+              fDiff: sign * fVal,
+              mDiff: sign * mVal,
+              bDiff: sign * bVal,
+              shotBy: wIdx,
+              netA: sign * totalWin
+            });
+            continue;
+          }
+
+          // Case 4: Normal 3-Lane Comparison
+          let fDiff = 0, mDiff = 0, bDiff = 0;
+          let winsA = 0, winsB = 0;
+
+          if (A.fEv.score > B.fEv.score) { fDiff = getLaneWinShui('front', A.fEv); winsA++; }
+          else if (B.fEv.score > A.fEv.score) { fDiff = -getLaneWinShui('front', B.fEv); winsB++; }
+
+          if (A.mEv.score > B.mEv.score) { mDiff = getLaneWinShui('mid', A.mEv); winsA++; }
+          else if (B.mEv.score > A.mEv.score) { mDiff = -getLaneWinShui('mid', B.mEv); winsB++; }
+
+          if (A.bEv.score > B.bEv.score) { bDiff = getLaneWinShui('back', A.bEv); winsA++; }
+          else if (B.bEv.score > A.bEv.score) { bDiff = -getLaneWinShui('back', B.bEv); winsB++; }
+
+          laneNet.front[i] += fDiff; laneNet.front[j] -= fDiff;
+          laneNet.mid[i] += mDiff; laneNet.mid[j] -= mDiff;
+          laneNet.back[i] += bDiff; laneNet.back[j] -= bDiff;
+
+          let baseNetA = fDiff + mDiff + bDiff;
+          let shotBy = null;
+          let finalNetA = baseNetA;
+          let note = '一般比牌';
+
+          if (winsA === 3) {
+            shotBy = i;
+            finalNetA = baseNetA * 2;
+            shootsGiven[i].push(j);
+            note = `${A.name} 打槍 ${B.name} (×2)`;
+          } else if (winsB === 3) {
+            shotBy = j;
+            finalNetA = baseNetA * 2;
+            shootsGiven[j].push(i);
+            note = `${B.name} 打槍 ${A.name} (×2)`;
+          }
+
+          totalDelta[i] += finalNetA;
+          totalDelta[j] -= finalNetA;
+
+          pairwise.push({
+            i, j, type: 'normal', note,
+            fDiff, mDiff, bDiff, shotBy, netA: finalNetA
+          });
+        }
+      }
+
+      // Check Home Run (全壘打: Shot all 3 opponents -> double won shui again!)
+      for (let i = 0; i < 4; i++) {
+        if (shootsGiven[i].length === 3) {
+          homeRunSeats.push(i);
+          for (const p of pairwise) {
+            if (p.shotBy === i) {
+              const victim = (p.i === i) ? p.j : p.i;
+              const extra = Math.abs(p.netA); // double again
+              totalDelta[i] += extra;
+              totalDelta[victim] -= extra;
+              p.netA = (p.i === i) ? p.netA * 2 : p.netA * 2;
+              p.note += ' + 全壘打再翻倍!';
+            }
+          }
+        }
+      }
+
+      return { evals, pairwise, totalDelta, laneNet, shootsGiven, homeRunSeats };
+    }
+
+    /* =========================================================================
+       5. APPLICATION STATE & PEERJS MULTIPLAYER (WITH SEAMLESS LOCAL FALLBACK)
+       ========================================================================= */
+    const appState = {
+      mode: 'local', // 'local' | 'host' | 'guest'
+      roomCode: '',
+      peer: null,
+      hostConn: null,
+      guestConns: {}, // peerId -> { conn, seatIdx }
+      aiDifficulty: 'normal',
+      mySeatIdx: 0,
+      round: 0,
+      phase: 'lobby', // 'lobby' | 'arranging' | 'waiting' | 'showdown' | 'settled'
+      seats: [
+        { seatIdx: 0, name: '牌聖玩家', isAi: false, peerId: 'local', totalShui: 0, locked: false },
+        { seatIdx: 1, name: 'AI 雀神', isAi: true, peerId: null, totalShui: 0, locked: false },
+        { seatIdx: 2, name: 'AI 賭俠', isAi: true, peerId: null, totalShui: 0, locked: false },
+        { seatIdx: 3, name: 'AI 牌王', isAi: true, peerId: null, totalShui: 0, locked: false }
+      ],
+
+      // Local player's arrangement state
+      hand: [],
+      lanes: { front: [], mid: [], back: [] },
+      selectedIds: new Set(),
+      sortMode: 'rank', // 'rank' | 'suit'
+      mySpecial: null,
+      suggestions: [],
+      timerSec: 60,
+      timerHandle: null,
+
+      // Host authoritative round storage
+      hostHands: [],
+      hostSubmissions: [null, null, null, null],
+      lastShowdown: null
+    };
+
+    function setNetBadge(text, ok = true) {
+      const desktop = document.getElementById('net-status-badge');
+      const mobile = document.getElementById('mobile-net-badge');
+      const dotColor = ok ? 'bg-emerald-400' : 'bg-amber-400';
+      desktop.innerHTML = `<span class="w-2 h-2 rounded-full ${dotColor}"></span> ${text}`;
+      mobile.textContent = text;
+    }
+
+    function setAiDifficulty(diff) {
+      appState.aiDifficulty = diff;
+      document.querySelectorAll('.ai-diff-btn').forEach(btn => {
+        const active = btn.dataset.diff === diff;
+        btn.className = active
+          ? 'ai-diff-btn py-1.5 rounded-xl text-xs font-black border border-amber-400 bg-amber-500/25 text-amber-200'
+          : 'ai-diff-btn py-1.5 rounded-xl text-xs font-bold border border-amber-500/30 bg-black/30 text-emerald-100';
+      });
+    }
+
+    function renderLobbySeats() {
+      const container = document.getElementById('lobby-seats');
+      container.innerHTML = '';
+      appState.seats.forEach((s, idx) => {
+        const isMe = idx === appState.mySeatIdx;
+        const card = document.createElement('div');
+        card.className = `p-2.5 rounded-xl border flex items-center justify-between gap-2 ${
+          isMe ? 'bg-amber-500/15 border-amber-400/70' : 'bg-black/35 border-amber-500/20'
+        }`;
+        card.innerHTML = `
+          <div class="min-w-0">
+            <div class="text-xs sm:text-sm font-black ${isMe ? 'text-amber-300' : 'text-white'} truncate">
+              ${s.isAi ? '🤖' : '👤'} ${s.name}
+            </div>
+            <div class="text-[10px] text-emerald-200/75">
+              ${isMe ? '你 (本機)' : (s.isAi ? `AI 補位 (${diffLabel(appState.aiDifficulty)})` : '已連線玩家')}
+            </div>
+          </div>
+          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-amber-200/90 shrink-0">座${idx + 1}</span>
+        `;
+        container.appendChild(card);
+      });
+
+      const startBtn = document.getElementById('btn-start-match');
+      if (appState.mode === 'guest') {
+        startBtn.disabled = true;
+        startBtn.textContent = '⏳ 等待房主開始發牌...';
+      } else {
+        startBtn.disabled = false;
+        startBtn.textContent = '🎴 開始發牌對戰';
+      }
+    }
+
+    function diffLabel(d) {
+      return d === 'easy' ? '放水新手' : (d === 'master' ? '大師' : '普通');
+    }
+
+    function generateRoomCode() {
+      return String(Math.floor(1000 + Math.random() * 9000));
+    }
+
+    function updateInviteQR(code) {
+      const url = `${window.location.origin}${window.location.pathname}?room=${code}`;
+      document.getElementById('room-code-display').textContent = `房號：${code}`;
+      document.getElementById('invite-status-text').textContent = `掃碼或複製網址邀請好友加入`;
+      document.getElementById('invite-url-preview').textContent = `?room=${code}`;
+      document.getElementById('btn-copy-invite').disabled = false;
+
+      const qrBox = document.getElementById('qr-container');
+      qrBox.innerHTML = '';
+      try {
+        if (typeof QRCode !== 'undefined') {
+          new QRCode(qrBox, {
+            text: url,
+            width: 72,
+            height: 72,
+            colorDark: '#062c1c',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+          });
+        } else {
+          qrBox.innerHTML = `<span class="text-[11px] font-black text-emerald-900 font-mono">${code}</span>`;
+        }
+      } catch (e) {
+        qrBox.innerHTML = `<span class="text-[11px] font-black text-emerald-900 font-mono">${code}</span>`;
+      }
+    }
+
+    function copyInviteLink() {
+      if (!appState.roomCode) return;
+      const url = `${window.location.origin}${window.location.pathname}?room=${appState.roomCode}`;
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+        showToast('已複製邀請網址！快傳給好友加入吧', 'success');
+      } catch (e) {
+        showToast(`請手動複製房號：${appState.roomCode}`, 'warn');
+      }
+    }
+
+    function cleanupPeer() {
+      if (appState.peer) {
+        try { appState.peer.destroy(); } catch (e) {}
+        appState.peer = null;
+      }
+      appState.hostConn = null;
+      appState.guestConns = {};
+    }
+
+    function fallbackToLocal(reason) {
+      cleanupPeer();
+      appState.mode = 'local';
+      appState.mySeatIdx = 0;
+      appState.roomCode = '';
+      setNetBadge('本機單機AI模式', false);
+      document.getElementById('room-code-display').textContent = '房號：本機單機';
+      document.getElementById('invite-status-text').textContent = reason || '已自動切換為本機單機 AI 對戰';
+      renderLobbySeats();
+    }
+
+    function createOnlineRoom() {
+      const myName = document.getElementById('player-name-input').value.trim() || '牌聖玩家';
+      appState.seats[0].name = myName;
+      cleanupPeer();
+
+      if (typeof Peer === 'undefined') {
+        fallbackToLocal('離線環境，自動降級為本機 AI 模式');
+        showToast('偵測到離線環境，已自動切換為單機 AI 模式', 'warn');
+        return;
+      }
+
+      const code = generateRoomCode();
+      const peerId = `tw13card-${code}`;
+      setNetBadge('連線中...', false);
+
+      let settled = false;
+      const timeoutId = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          fallbackToLocal('連線逾時，自動切換本機 AI 模式');
+          showToast('P2P 伺服器連線受限，已無縫降級為單機 AI 模式', 'warn');
+        }
+      }, 4500);
+
+      try {
+        const peer = new Peer(peerId, { debug: 0 });
+        appState.peer = peer;
+
+        peer.on('open', () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
+          appState.mode = 'host';
+          appState.roomCode = code;
+          appState.mySeatIdx = 0;
+          setNetBadge(`線上房主 #${code}`, true);
+          updateInviteQR(code);
+          renderLobbySeats();
+          showToast(`房間 ${code} 建立成功！等待好友或直接開局`, 'success');
+        });
+
+        peer.on('connection', (conn) => {
+          conn.on('data', (data) => handleHostReceive(conn, data));
+          conn.on('close', () => handleGuestDisconnect(conn.peer));
+        });
+
+        peer.on('error', () => {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timeoutId);
+            fallbackToLocal('沙盒環境限制，自動切換本機 AI 模式');
+            showToast('偵測到連線受限，已自動降級為單機 AI 模式', 'warn');
+          }
+        });
+      } catch (e) {
+        clearTimeout(timeoutId);
+        fallbackToLocal('自動切換本機 AI 模式');
+      }
+    }
+
+    function joinOnlineRoom() {
+      const code = document.getElementById('join-room-input').value.trim();
+      if (!code) {
+        showToast('請輸入 4 位數房號', 'warn');
+        return;
+      }
+      const myName = document.getElementById('player-name-input').value.trim() || '牌友';
+      cleanupPeer();
+
+      if (typeof Peer === 'undefined') {
+        fallbackToLocal('離線環境，無法連線，已切換單機 AI');
+        showToast('目前為離線環境，已切換單機模式', 'warn');
+        return;
+      }
+
+      setNetBadge(`加入 #${code}...`, false);
+      let connected = false;
+      const timeoutId = setTimeout(() => {
+        if (!connected) {
+          fallbackToLocal('找不到房間或連線受限，切換單機模式');
+          showToast('無法連線至該房間，已切回單機 AI 模式', 'warn');
+        }
+      }, 5000);
+
+      try {
+        const peer = new Peer(undefined, { debug: 0 });
+        appState.peer = peer;
+
+        peer.on('open', () => {
+          const conn = peer.connect(`tw13card-${code}`, { reliable: true });
+          appState.hostConn = conn;
+
+          conn.on('open', () => {
+            connected = true;
+            clearTimeout(timeoutId);
+            appState.mode = 'guest';
+            appState.roomCode = code;
+            setNetBadge(`已加入 #${code}`, true);
+            document.getElementById('room-code-display').textContent = `房號：${code}`;
+            conn.send({ type: 'JOIN', name: myName });
+            showToast(`成功加入房間 ${code}！`, 'success');
+          });
+
+          conn.on('data', (data) => handleGuestReceive(data));
+          conn.on('close', () => {
+            showToast('與房主斷開連線，返回大廳', 'warn');
+            leaveToLobby();
+          });
+        });
+
+        peer.on('error', () => {
+          if (!connected) {
+            clearTimeout(timeoutId);
+            fallbackToLocal('連線受限，已切換本機 AI 模式');
+          }
+        });
+      } catch (e) {
+        clearTimeout(timeoutId);
+        fallbackToLocal('自動切換本機 AI 模式');
+      }
+    }
+
+    function handleHostReceive(conn, data) {
+      if (!data || !data.type) return;
+      if (data.type === 'JOIN') {
+        const openSeat = appState.seats.find(s => s.isAi);
+        if (!openSeat) {
+          conn.send({ type: 'FULL' });
+          return;
+        }
+        openSeat.isAi = false;
+        openSeat.name = (data.name || '連線玩家').slice(0, 10);
+        openSeat.peerId = conn.peer;
+        appState.guestConns[conn.peer] = { conn, seatIdx: openSeat.seatIdx };
+        conn.send({ type: 'ASSIGN_SEAT', seatIdx: openSeat.seatIdx });
+        broadcastLobbyState();
+        renderLobbySeats();
+        showToast(`${openSeat.name} 加入房間！`, 'success');
+      } else if (data.type === 'SUBMIT') {
+        const guest = appState.guestConns[conn.peer];
+        if (!guest) return;
+        hostReceiveSubmission(guest.seatIdx, data.submission);
+      }
+    }
+
+    function handleGuestDisconnect(peerId) {
+      const info = appState.guestConns[peerId];
+      if (!info) return;
+      const seat = appState.seats[info.seatIdx];
+      seat.isAi = true;
+      seat.name = `AI 補位${info.seatIdx + 1}`;
+      seat.peerId = null;
+      delete appState.guestConns[peerId];
+      broadcastLobbyState();
+      renderLobbySeats();
+      showToast(`座位 ${info.seatIdx + 1} 玩家離開，已由 AI 接管`, 'warn');
+      if (appState.phase === 'arranging' && !appState.hostSubmissions[info.seatIdx]) {
+        const aiSub = computeAiArrangement(appState.hostHands[info.seatIdx], appState.aiDifficulty);
+        hostReceiveSubmission(info.seatIdx, aiSub);
+      }
+    }
+
+    function broadcastLobbyState() {
+      Object.values(appState.guestConns).forEach(({ conn }) => {
+        try {
+          conn.send({ type: 'LOBBY_STATE', seats: appState.seats, aiDifficulty: appState.aiDifficulty });
+        } catch (e) {}
+      });
+    }
+
+    function handleGuestReceive(data) {
+      if (!data || !data.type) return;
+      if (data.type === 'FULL') {
+        showToast('該房間已滿員！', 'error');
+        fallbackToLocal('房間已滿');
+      } else if (data.type === 'ASSIGN_SEAT') {
+        appState.mySeatIdx = data.seatIdx;
+      } else if (data.type === 'LOBBY_STATE') {
+        appState.seats = data.seats;
+        appState.aiDifficulty = data.aiDifficulty;
+        renderLobbySeats();
+      } else if (data.type === 'DEAL') {
+        appState.round = data.round;
+        appState.seats = data.seats;
+        beginLocalArrangementPhase(data.hand);
+      } else if (data.type === 'LOCK_UPDATE') {
+        appState.seats[data.seatIdx].locked = true;
+        renderOpponents();
+      } else if (data.type === 'SHOWDOWN') {
+        appState.seats = data.seats;
+        runShowdownSequence(data.result);
+      }
+    }
+
+    /* =========================================================================
+       6. GAME FLOW: START, DEAL, ARRANGE, SHOWDOWN, SETTLEMENT
+       ========================================================================= */
+    function startQuickLocalGame() {
+      const myName = document.getElementById('player-name-input').value.trim() || '牌聖玩家';
+      cleanupPeer();
+      appState.mode = 'local';
+      appState.mySeatIdx = 0;
+      appState.seats = [
+        { seatIdx: 0, name: myName, isAi: false, peerId: 'local', totalShui: 0, locked: false },
+        { seatIdx: 1, name: 'AI 雀神', isAi: true, peerId: null, totalShui: 0, locked: false },
+        { seatIdx: 2, name: 'AI 賭俠', isAi: true, peerId: null, totalShui: 0, locked: false },
+        { seatIdx: 3, name: 'AI 牌王', isAi: true, peerId: null, totalShui: 0, locked: false }
+      ];
+      appState.round = 0;
+      hostStartGame();
+    }
+
+    function hostStartGame() {
+      const myName = document.getElementById('player-name-input').value.trim() || '牌聖玩家';
+      appState.seats[appState.mySeatIdx].name = myName;
+      startNewRoundAsHost();
+    }
+
+    function startNewRoundAsHost() {
+      appState.round++;
+      const deck = createDeck();
+      appState.hostHands = [
+        deck.slice(0, 13),
+        deck.slice(13, 26),
+        deck.slice(26, 39),
+        deck.slice(39, 52)
+      ];
+      appState.hostSubmissions = [null, null, null, null];
+      appState.seats.forEach(s => { s.locked = false; });
+
+      // Send hands to connected guests
+      Object.values(appState.guestConns).forEach(({ conn, seatIdx }) => {
+        try {
+          conn.send({
+            type: 'DEAL',
+            round: appState.round,
+            seats: appState.seats,
+            hand: appState.hostHands[seatIdx]
+          });
+        } catch (e) {}
+      });
+
+      // Begin local player arrangement
+      beginLocalArrangementPhase(appState.hostHands[appState.mySeatIdx]);
+
+      // Schedule AI thinking (realistic slight delay 1.5s ~ 3.5s)
+      appState.seats.forEach((s, idx) => {
+        if (s.isAi) {
+          const delay = 1400 + Math.random() * 2000;
+          setTimeout(() => {
+            if (appState.phase === 'arranging' || appState.phase === 'waiting') {
+              const sub = computeAiArrangement(appState.hostHands[idx], appState.aiDifficulty);
+              hostReceiveSubmission(idx, sub);
+            }
+          }, delay);
+        }
+      });
+    }
+
+    function beginLocalArrangementPhase(cards13) {
+      document.getElementById('lobby-screen').classList.add('hidden');
+      document.getElementById('game-screen').classList.remove('hidden');
+      document.getElementById('game-screen').classList.add('flex');
+      document.getElementById('settlement-modal').classList.add('hidden');
+
+      appState.phase = 'arranging';
+      appState.hand = cards13.slice();
+      appState.lanes = { front: [], mid: [], back: [] };
+      appState.selectedIds = new Set();
+      appState.lastShowdown = null;
+
+      sortHandArray();
+
+      // Detect special hand (報到)
+      appState.mySpecial = detectSpecialHand(cards13);
+      const specBtn = document.getElementById('btn-special-declare');
+      if (appState.mySpecial) {
+        specBtn.textContent = `🐉 報到：${appState.mySpecial.name} (+${appState.mySpecial.shui}水)`;
+        specBtn.classList.remove('hidden');
+      } else {
+        specBtn.classList.add('hidden');
+      }
+
+      // Compute 2-3 Smart Recommended Arrangements
+      const { bestList } = findBestArrangements(cards13);
+      appState.suggestions = bestList;
+      renderSuggestions();
+
+      // Show arrangement controls
+      document.getElementById('assist-bar').classList.remove('hidden');
+      document.getElementById('hand-control-section').classList.remove('hidden');
+      ['front', 'mid', 'back'].forEach(l => {
+        document.getElementById(`score-${l}`).classList.add('hidden');
+      });
+
+      // Update HUD
+      document.getElementById('hud-round').textContent = `第 ${appState.round} 局`;
+      document.getElementById('hud-room-tag').textContent = appState.roomCode ? `房號 #${appState.roomCode}` : '本機單機模式';
+      document.getElementById('hud-my-score').innerHTML = `總水數：<strong class="text-amber-300">${appState.seats[appState.mySeatIdx].totalShui}</strong>`;
+      document.getElementById('stage-status-text').textContent = '點選手牌後點擊頭/中/尾墩放入，或套用推薦擺法';
+
+      renderOpponents();
+      renderAllLanes();
+      renderHand();
+
+      audioEngine.playSfx('deal');
+      audioEngine.speak(`第${appState.round}局發牌，請開始擺牌`);
+
+      // Start 60s countdown
+      startArrangementTimer(60);
+    }
+
+    function startArrangementTimer(seconds) {
+      if (appState.timerHandle) clearInterval(appState.timerHandle);
+      appState.timerSec = seconds;
+      const el = document.getElementById('timer-display');
+      el.textContent = `${appState.timerSec}s`;
+
+      appState.timerHandle = setInterval(() => {
+        appState.timerSec--;
+        el.textContent = `${Math.max(0, appState.timerSec)}s`;
+        if (appState.timerSec <= 0) {
+          clearInterval(appState.timerHandle);
+          appState.timerHandle = null;
+          if (appState.phase === 'arranging') {
+            showToast('時間到！系統已自動套用最佳擺法', 'warn');
+            if (appState.suggestions.length > 0) applySuggestion(0);
+            confirmPlayerArrangement();
+          }
+        }
+      }, 1000);
+    }
+
+    /* =========================================================================
+       7. CARD INTERACTION & RENDERING
+       ========================================================================= */
+    function createCardElement(card, variant = 'hand', isSelected = false) {
+      const div = document.createElement('div');
+      const colorClass = SUIT_COLORS[card.suit];
+      const rankTxt = RANK_LABELS[card.rank];
+      const suitTxt = SUITS[card.suit];
+
+      div.className = `p-card ${colorClass} ${variant}-card ${isSelected ? 'selected' : ''}`;
+
+      if (variant === 'mini') {
+        div.innerHTML = `
+          <div class="text-[9px] sm:text-[11px] font-black leading-none">${rankTxt}</div>
+          <div class="text-[10px] sm:text-xs leading-none self-end">${suitTxt}</div>
+        `;
+      } else {
+        div.innerHTML = `
+          <div class="flex flex-col items-start leading-none">
+            <span class="text-xs sm:text-sm font-black tracking-tighter">${rankTxt}</span>
+            <span class="text-[10px] sm:text-xs -mt-0.5">${suitTxt}</span>
+          </div>
+          <div class="text-lg sm:text-2xl leading-none self-end opacity-90">${suitTxt}</div>
+        `;
+      }
+      return div;
+    }
+
+    function sortHandArray() {
+      if (appState.sortMode === 'rank') {
+        appState.hand.sort((a, b) => b.rank - a.rank || a.suit - b.suit);
+      } else {
+        appState.hand.sort((a, b) => a.suit - b.suit || b.rank - a.rank);
+      }
+    }
+
+    function toggleHandSort() {
+      appState.sortMode = appState.sortMode === 'rank' ? 'suit' : 'rank';
+      document.getElementById('btn-sort-hand').textContent = appState.sortMode === 'rank' ? '⇅ 依點數' : '⇅ 依花色';
+      sortHandArray();
+      renderHand();
+      audioEngine.playSfx('select');
+    }
+
+    function renderHand() {
+      const tray = document.getElementById('hand-tray');
+      tray.innerHTML = '';
+
+      if (appState.hand.length === 0) {
+        tray.innerHTML = `<div class="text-xs text-emerald-200/70 font-bold py-4">13 張牌已全部分配完成！請確認牌型無倒水後點擊「確認擺牌」</div>`;
+      } else {
+        appState.hand.forEach(card => {
+          const isSel = appState.selectedIds.has(card.id);
+          const el = createCardElement(card, 'hand', isSel);
+          el.onclick = () => {
+            if (appState.phase !== 'arranging') return;
+            if (appState.selectedIds.has(card.id)) appState.selectedIds.delete(card.id);
+            else appState.selectedIds.add(card.id);
+            audioEngine.playSfx('select');
+            renderHand();
+            updateLaneHighlights();
+          };
+          tray.appendChild(el);
+        });
+      }
+
+      document.getElementById('hand-count-hint').textContent = `手牌剩餘 ${appState.hand.length} 張`;
+      updateLaneHighlights();
+    }
+
+    function updateLaneHighlights() {
+      const hasSel = appState.selectedIds.size > 0 && appState.phase === 'arranging';
+      const limits = { front: 3, mid: 5, back: 5 };
+      ['front', 'mid', 'back'].forEach(lane => {
+        const el = document.getElementById(`lane-${lane}`);
+        const space = limits[lane] - appState.lanes[lane].length;
+        if (hasSel && space > 0) el.classList.add('can-drop');
+        else el.classList.remove('can-drop');
+      });
+    }
+
+    function handleLaneClick(lane) {
+      if (appState.phase !== 'arranging') return;
+      if (appState.selectedIds.size === 0) return;
+
+      const limits = { front: 3, mid: 5, back: 5 };
+      const space = limits[lane] - appState.lanes[lane].length;
+      if (space <= 0) {
+        showToast(`${lane === 'front' ? '頭墩' : lane === 'mid' ? '中墩' : '尾墩'}已滿，請先點擊該墩牌張收回`, 'warn');
+        return;
+      }
+
+      const toMove = appState.hand.filter(c => appState.selectedIds.has(c.id)).slice(0, space);
+      const moveIds = new Set(toMove.map(c => c.id));
+      appState.hand = appState.hand.filter(c => !moveIds.has(c.id));
+      appState.lanes[lane].push(...toMove);
+      appState.lanes[lane].sort((a, b) => b.rank - a.rank || a.suit - b.suit);
+      appState.selectedIds.clear();
+
+      audioEngine.playSfx('place');
+      renderAllLanes();
+      renderHand();
+    }
+
+    function returnCardFromLane(lane, cardId, evt) {
+      evt.stopPropagation();
+      if (appState.phase !== 'arranging') return;
+      const idx = appState.lanes[lane].findIndex(c => c.id === cardId);
+      if (idx === -1) return;
+      const [card] = appState.lanes[lane].splice(idx, 1);
+      appState.hand.push(card);
+      sortHandArray();
+      audioEngine.playSfx('select');
+      renderAllLanes();
+      renderHand();
+    }
+
+    function clearAllLanes() {
+      if (appState.phase !== 'arranging') return;
+      appState.hand.push(...appState.lanes.front, ...appState.lanes.mid, ...appState.lanes.back);
+      appState.lanes = { front: [], mid: [], back: [] };
+      appState.selectedIds.clear();
+      sortHandArray();
+      audioEngine.playSfx('select');
+      renderAllLanes();
+      renderHand();
+    }
+
+    function renderSuggestions() {
+      const box = document.getElementById('suggestions-container');
+      box.innerHTML = `<span class="text-[11px] text-amber-200/80 font-bold shrink-0">💡 推薦：</span>`;
+      appState.suggestions.forEach((sol, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'px-2.5 py-1 rounded-full bg-emerald-900/90 hover:bg-emerald-800 border border-amber-400/50 text-[11px] font-bold text-amber-100 whitespace-nowrap shrink-0 transition active:scale-95';
+        btn.textContent = `${sol.fEv.name} / ${sol.mEv.name} / ${sol.bEv.name}`;
+        btn.onclick = () => applySuggestion(idx);
+        box.appendChild(btn);
+      });
+    }
+
+    function applySuggestion(idx) {
+      if (appState.phase !== 'arranging') return;
+      const sol = appState.suggestions[idx];
+      if (!sol) return;
+      appState.lanes.front = sol.front.slice().sort((a, b) => b.rank - a.rank);
+      appState.lanes.mid = sol.mid.slice().sort((a, b) => b.rank - a.rank);
+      appState.lanes.back = sol.back.slice().sort((a, b) => b.rank - a.rank);
+      appState.hand = [];
+      appState.selectedIds.clear();
+      audioEngine.playSfx('place');
+      renderAllLanes();
+      renderHand();
+    }
+
+    function renderAllLanes() {
+      const fEv = appState.lanes.front.length === 3 ? eval3(appState.lanes.front) : null;
+      const mEv = appState.lanes.mid.length === 5 ? eval5(appState.lanes.mid) : null;
+      const bEv = appState.lanes.back.length === 5 ? eval5(appState.lanes.back) : null;
+
+      const evalMap = { front: fEv, mid: mEv, back: bEv };
+      ['front', 'mid', 'back'].forEach(lane => {
+        const cardContainer = document.getElementById(`cards-${lane}`);
+        cardContainer.innerHTML = '';
+        if (appState.lanes[lane].length === 0) {
+          cardContainer.innerHTML = `<span class="text-[11px] text-emerald-200/40 font-bold">點擊放入牌</span>`;
+        } else {
+          appState.lanes[lane].forEach(c => {
+            const el = createCardElement(c, 'lane');
+            el.onclick = (e) => returnCardFromLane(lane, c.id, e);
+            cardContainer.appendChild(el);
+          });
+        }
+
+        const rankBadge = document.getElementById(`rank-${lane}`);
+        const ev = evalMap[lane];
+        if (ev) {
+          const bonus = getLaneWinShui(lane, ev);
+          rankBadge.textContent = bonus > 1 ? `${ev.name} (+${bonus}水)` : ev.name;
+          rankBadge.className = bonus > 1
+            ? 'px-1.5 py-0.5 rounded bg-amber-500/30 border border-amber-300/60 text-[10px] sm:text-xs font-black text-amber-200 whitespace-nowrap'
+            : 'px-1.5 py-0.5 rounded bg-black/50 text-[10px] sm:text-xs font-bold text-emerald-200 whitespace-nowrap';
+        } else {
+          rankBadge.textContent = `${appState.lanes[lane].length}/${lane === 'front' ? 3 : 5}`;
+          rankBadge.className = 'px-1.5 py-0.5 rounded bg-black/40 text-[10px] sm:text-xs font-bold text-slate-300 whitespace-nowrap';
+        }
+      });
+
+      // Live Foul Detection (倒水檢查)
+      let isFoul = false;
+      if (fEv && mEv && mEv.score < fEv.score) isFoul = true;
+      if (mEv && bEv && bEv.score < mEv.score) isFoul = true;
+      if (fEv && bEv && bEv.score < fEv.score) isFoul = true;
+
+      const foulBadge = document.getElementById('foul-warning-badge');
+      ['front', 'mid', 'back'].forEach(l => document.getElementById(`lane-${l}`).classList.remove('foul-lane'));
+      if (isFoul) {
+        foulBadge.classList.remove('hidden');
+        if (fEv && mEv && mEv.score < fEv.score) {
+          document.getElementById('lane-front').classList.add('foul-lane');
+          document.getElementById('lane-mid').classList.add('foul-lane');
+        }
+        if (mEv && bEv && bEv.score < mEv.score) {
+          document.getElementById('lane-mid').classList.add('foul-lane');
+          document.getElementById('lane-back').classList.add('foul-lane');
+        }
+      } else {
+        foulBadge.classList.add('hidden');
+      }
+
+      const allPlaced = appState.lanes.front.length === 3 && appState.lanes.mid.length === 5 && appState.lanes.back.length === 5;
+      document.getElementById('btn-confirm-hand').disabled = !allPlaced;
+    }
+
+    function declareSpecialHand() {
+      if (appState.phase !== 'arranging' || !appState.mySpecial) return;
+      const all13 = [...appState.hand, ...appState.lanes.front, ...appState.lanes.mid, ...appState.lanes.back];
+      submitMyHand({
+        front: all13.slice(0, 3),
+        mid: all13.slice(3, 8),
+        back: all13.slice(8, 13),
+        isSpecial: true,
+        special: appState.mySpecial
+      });
+    }
+
+    function confirmPlayerArrangement() {
+      if (appState.phase !== 'arranging') return;
+      if (appState.lanes.front.length !== 3 || appState.lanes.mid.length !== 5 || appState.lanes.back.length !== 5) return;
+
+      submitMyHand({
+        front: appState.lanes.front.slice(),
+        mid: appState.lanes.mid.slice(),
+        back: appState.lanes.back.slice(),
+        isSpecial: false,
+        special: null
+      });
+    }
+
+    function submitMyHand(submission) {
+      if (appState.timerHandle) {
+        clearInterval(appState.timerHandle);
+        appState.timerHandle = null;
+      }
+      appState.phase = 'waiting';
+      document.getElementById('assist-bar').classList.add('hidden');
+      document.getElementById('hand-control-section').classList.add('hidden');
+      document.getElementById('stage-status-text').textContent = submission.isSpecial
+        ? `已宣告報到【${submission.special.name}】，等待其他玩家...`
+        : '已完成擺牌！等待其他玩家鎖定...';
+
+      audioEngine.playSfx('lock');
+      if (submission.isSpecial) {
+        audioEngine.speak(`報到！${submission.special.name}`);
+      }
+
+      if (appState.mode === 'guest' && appState.hostConn) {
+        appState.hostConn.send({ type: 'SUBMIT', submission });
+      } else {
+        hostReceiveSubmission(appState.mySeatIdx, submission);
+      }
+    }
+
+    function hostReceiveSubmission(seatIdx, submission) {
+      if (appState.hostSubmissions[seatIdx]) return;
+      appState.hostSubmissions[seatIdx] = {
+        seatIdx,
+        name: appState.seats[seatIdx].name,
+        ...submission
+      };
+      appState.seats[seatIdx].locked = true;
+
+      // Notify guests
+      Object.values(appState.guestConns).forEach(({ conn }) => {
+        try { conn.send({ type: 'LOCK_UPDATE', seatIdx }); } catch (e) {}
+      });
+
+      renderOpponents();
+
+      // Check if all 4 players submitted
+      if (appState.hostSubmissions.every(s => s !== null)) {
+        const result = evaluateRoundShowdown(appState.hostSubmissions);
+        // Update cumulative scores
+        for (let i = 0; i < 4; i++) {
+          appState.seats[i].totalShui += result.totalDelta[i];
+        }
+        // Broadcast showdown to guests
+        Object.values(appState.guestConns).forEach(({ conn }) => {
+          try { conn.send({ type: 'SHOWDOWN', result, seats: appState.seats }); } catch (e) {}
+        });
+        runShowdownSequence(result);
+      }
+    }
+
+    /* =========================================================================
+       8. OPPONENTS RENDERING & ANIMATED SHOWDOWN SEQUENCE
+       ========================================================================= */
+    function getOpponentSeats() {
+      const res = [];
+      for (let offset = 1; offset <= 3; offset++) {
+        res.push((appState.mySeatIdx + offset) % 4);
+      }
+      return res;
+    }
+
+    function renderOpponents(revealStage = 0) {
+      // revealStage: 0=hidden, 1=front, 2=front+mid, 3=all
+      const container = document.getElementById('opponents-row');
+      container.innerHTML = '';
+      const oppIndices = getOpponentSeats();
+      const sd = appState.lastShowdown;
+
+      oppIndices.forEach(seatIdx => {
+        const seat = appState.seats[seatIdx];
+        const evData = sd ? sd.evals[seatIdx] : null;
+        const card = document.createElement('div');
+        card.className = 'rounded-xl bg-black/40 border border-amber-500/30 p-1.5 sm:p-2 flex flex-col gap-1 min-w-0';
+
+        // Header line
+        let statusTag = seat.locked
+          ? '<span class="px-1.5 py-0.5 rounded bg-emerald-700/80 text-[10px] text-emerald-100 font-bold">已鎖定</span>'
+          : '<span class="px-1.5 py-0.5 rounded bg-amber-900/80 text-[10px] text-amber-200 font-bold animate-pulse">擺牌中</span>';
+
+        if (revealStage > 0 && evData) {
+          if (evData.isSpecial) {
+            statusTag = `<span class="px-1.5 py-0.5 rounded bg-red-600 text-[10px] text-white font-black">🐉 ${evData.special.name}</span>`;
+          } else if (evData.isFoul) {
+            statusTag = `<span class="px-1.5 py-0.5 rounded bg-red-700 text-[10px] text-white font-black">⚠️ 倒水</span>`;
+          } else {
+            const delta = sd.totalDelta[seatIdx];
+            statusTag = `<span class="px-1.5 py-0.5 rounded ${delta >= 0 ? 'bg-amber-500/30 text-amber-200' : 'bg-slate-800 text-slate-300'} text-[10px] font-black">${revealStage === 3 ? (delta >= 0 ? `+${delta}水` : `${delta}水`) : '比牌中'}</span>`;
+          }
+        }
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-1">
+            <div class="text-[11px] sm:text-xs font-black text-amber-100 truncate">${seat.isAi ? '🤖' : '👤'} ${seat.name}</div>
+            ${statusTag}
+          </div>
+          <div class="text-[10px] text-emerald-200/75 flex justify-between">
+            <span>總水數：<strong class="text-amber-300">${seat.totalShui}</strong></span>
+          </div>
+        `;
+
+        // Show mini revealed lanes during Showdown
+        if (revealStage > 0 && evData) {
+          const lanesWrap = document.createElement('div');
+          lanesWrap.className = 'space-y-1 pt-0.5 border-t border-amber-500/20';
+
+          if (evData.isSpecial) {
+            lanesWrap.innerHTML = `<div class="text-center py-2 text-xs font-black text-amber-300">報到免比牌 (+${evData.special.shui}水/家)</div>`;
+          } else {
+            const laneDefs = [
+              { key: 'front', label: '頭', cards: evData.front, ev: evData.fEv, minStage: 1 },
+              { key: 'mid', label: '中', cards: evData.mid, ev: evData.mEv, minStage: 2 },
+              { key: 'back', label: '尾', cards: evData.back, ev: evData.bEv, minStage: 3 }
+            ];
+            laneDefs.forEach(ld => {
+              const row = document.createElement('div');
+              row.className = 'flex items-center justify-between gap-1';
+              const cardsEl = document.createElement('div');
+              cardsEl.className = 'flex items-center';
+              if (revealStage >= ld.minStage) {
+                ld.cards.forEach(c => cardsEl.appendChild(createCardElement(c, 'mini')));
+              } else {
+                for (let k = 0; k < ld.cards.length; k++) {
+                  const bk = document.createElement('div');
+                  bk.className = 'p-card mini-card p-card-back';
+                  cardsEl.appendChild(bk);
+                }
+              }
+              const lbl = document.createElement('span');
+              lbl.className = 'text-[9px] sm:text-[10px] font-bold text-amber-200/90 shrink-0';
+              lbl.textContent = revealStage >= ld.minStage ? ld.ev.name : `${ld.label}墩`;
+              row.appendChild(cardsEl);
+              row.appendChild(lbl);
+              lanesWrap.appendChild(row);
+            });
+          }
+          card.appendChild(lanesWrap);
+        }
+
+        container.appendChild(card);
+      });
+    }
+
+    async function runShowdownSequence(result) {
+      appState.phase = 'showdown';
+      appState.lastShowdown = result;
+      document.getElementById('timer-display').textContent = '比牌';
+
+      const myIdx = appState.mySeatIdx;
+      const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+      // Step 0: Announce any Special Hand (報到)
+      const specials = result.evals.filter(e => e.isSpecial);
+      if (specials.length > 0) {
+        const txt = specials.map(s => `${s.name}【${s.special.name}】`).join('、');
+        document.getElementById('stage-status-text').textContent = `特殊報到：${txt}`;
+        audioEngine.playSfx('homerun');
+        audioEngine.speak(`恭喜報到！${txt}`);
+        showDramaticBanner('🐉 特殊牌型報到！', txt);
+        renderOpponents(1);
+        await sleep(1700);
+      }
+
+      // Step 1: Front Lane (頭墩)
+      document.getElementById('stage-status-text').textContent = '▶ 第一步：比頭墩（3張）';
+      audioEngine.playSfx('reveal');
+      audioEngine.speak('比頭墩');
+      renderOpponents(1);
+      showMyLaneScore('front', result.laneNet.front[myIdx]);
+      await sleep(1250);
+
+      // Step 2: Middle Lane (中墩)
+      document.getElementById('stage-status-text').textContent = '▶ 第二步：比中墩（5張）';
+      audioEngine.playSfx('reveal');
+      audioEngine.speak('比中墩');
+      renderOpponents(2);
+      showMyLaneScore('mid', result.laneNet.mid[myIdx]);
+      await sleep(1250);
+
+      // Step 3: Back Lane (尾墩)
+      document.getElementById('stage-status-text').textContent = '▶ 第三步：比尾墩（5張）';
+      audioEngine.playSfx('reveal');
+      audioEngine.speak('比尾墩');
+      renderOpponents(3);
+      showMyLaneScore('back', result.laneNet.back[myIdx]);
+      await sleep(1250);
+
+      // Step 4: Shoot (打槍) & Home Run (全壘打) FX
+      const totalShoots = result.shootsGiven.reduce((acc, arr) => acc + arr.length, 0);
+      if (result.homeRunSeats.length > 0) {
+        const hrNames = result.homeRunSeats.map(i => appState.seats[i].name).join('、');
+        document.getElementById('stage-status-text').textContent = `💥 全壘打！${hrNames} 橫掃全場！`;
+        audioEngine.playSfx('shoot');
+        setTimeout(() => audioEngine.playSfx('homerun'), 220);
+        audioEngine.speak(`全壘打！${hrNames} 打槍三家，水數再翻倍！`);
+        showDramaticBanner('💥 全壘打 HOME RUN!', `${hrNames} 橫掃三家！`);
+        await sleep(1900);
+      } else if (totalShoots > 0) {
+        const shooters = [];
+        result.shootsGiven.forEach((victims, sIdx) => {
+          if (victims.length > 0) {
+            shooters.push(`${appState.seats[sIdx].name} 打槍 ${victims.map(v => appState.seats[v].name).join('、')}`);
+          }
+        });
+        document.getElementById('stage-status-text').textContent = `🔫 ${shooters.join(' ｜ ')}`;
+        audioEngine.playSfx('shoot');
+        audioEngine.speak(`打槍！${shooters[0]}`);
+        showDramaticBanner('🔫 打槍 SHOOT ×2', shooters.join(' / '));
+        await sleep(1800);
+      }
+
+      // Update HUD cumulative score
+      document.getElementById('hud-my-score').innerHTML = `總水數：<strong class="text-amber-300">${appState.seats[myIdx].totalShui}</strong>`;
+
+      // Open 3-section Sticky Footer Settlement Modal
+      appState.phase = 'settled';
+      openSettlementModal(result);
+    }
+
+    function showMyLaneScore(lane, net) {
+      const el = document.getElementById(`score-${lane}`);
+      el.classList.remove('hidden');
+      el.textContent = net > 0 ? `+${net} 水` : `${net} 水`;
+      el.className = `text-xs font-black px-2 py-0.5 rounded-full ${
+        net > 0 ? 'bg-amber-500/30 text-amber-200 border border-amber-400/60'
+        : net < 0 ? 'bg-red-900/70 text-red-200 border border-red-400/50'
+        : 'bg-black/60 text-slate-300'
+      }`;
+    }
+
+    function openSettlementModal(result) {
+      const myIdx = appState.mySeatIdx;
+      const myDelta = result.totalDelta[myIdx];
+
+      document.getElementById('settle-title').textContent = `第 ${appState.round} 局 結算戰報`;
+      const highlights = [];
+      if (result.homeRunSeats.length > 0) highlights.push('💥 本局出現全壘打');
+      if (result.evals.some(e => e.isSpecial)) highlights.push('🐉 本局出現特殊報到');
+      if (result.evals.some(e => e.isFoul)) highlights.push('⚠️ 本局有玩家倒水');
+      document.getElementById('settle-subtitle').textContent = highlights.length ? highlights.join('・') : '四家逐墩比牌完成';
+
+      const deltaBadge = document.getElementById('settle-my-delta');
+      deltaBadge.textContent = myDelta >= 0 ? `本局 +${myDelta} 水` : `本局 ${myDelta} 水`;
+      deltaBadge.className = `px-3 py-1 rounded-full text-sm font-black border ${
+        myDelta > 0 ? 'bg-amber-500/25 border-amber-300 text-amber-200'
+        : myDelta < 0 ? 'bg-red-900/60 border-red-400 text-red-200'
+        : 'bg-black/45 border-slate-500 text-slate-200'
+      }`;
+
+      const body = document.getElementById('settle-body');
+      body.innerHTML = '';
+
+      // 1. Overall Standings Table
+      const standCard = document.createElement('div');
+      standCard.className = 'rounded-xl bg-black/35 border border-amber-500/25 overflow-hidden';
+      let rowsHtml = '';
+      appState.seats.forEach((s, idx) => {
+        const d = result.totalDelta[idx];
+        const ev = result.evals[idx];
+        const tags = [];
+        if (result.homeRunSeats.includes(idx)) tags.push('<span class="px-1.5 py-0.5 rounded bg-red-600 text-[10px] text-white font-black">全壘打</span>');
+        else if (result.shootsGiven[idx].length > 0) tags.push(`<span class="px-1.5 py-0.5 rounded bg-amber-600 text-[10px] text-white font-black">打槍×${result.shootsGiven[idx].length}</span>`);
+        if (ev.isSpecial) tags.push(`<span class="px-1.5 py-0.5 rounded bg-purple-600 text-[10px] text-white font-black">${ev.special.name}</span>`);
+        if (ev.isFoul) tags.push('<span class="px-1.5 py-0.5 rounded bg-red-800 text-[10px] text-red-100 font-black">倒水</span>');
+
+        rowsHtml += `
+          <tr class="border-t border-amber-500/15 ${idx === myIdx ? 'bg-amber-500/10' : ''}">
+            <td class="px-3 py-2 font-bold text-xs sm:text-sm ${idx === myIdx ? 'text-amber-300' : 'text-white'}">
+              ${s.name} ${tags.join(' ')}
+            </td>
+            <td class="px-3 py-2 text-right font-mono font-black text-xs sm:text-sm ${d > 0 ? 'text-amber-300' : d < 0 ? 'text-red-300' : 'text-slate-300'}">
+              ${d > 0 ? '+' + d : d} 水
+            </td>
+            <td class="px-3 py-2 text-right font-mono font-bold text-xs sm:text-sm text-emerald-200">
+              ${s.totalShui} 水
+            </td>
+          </tr>
+        `;
+      });
+      standCard.innerHTML = `
+        <table class="w-full text-left">
+          <thead class="bg-black/40 text-[11px] text-amber-200/80">
+            <tr>
+              <th class="px-3 py-2">玩家</th>
+              <th class="px-3 py-2 text-right">本局水數</th>
+              <th class="px-3 py-2 text-right">累計總水數</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      `;
+      body.appendChild(standCard);
+
+      // 2. Pairwise Comparison Breakdown (Focus on local player first, then others)
+      const detailTitle = document.createElement('div');
+      detailTitle.className = 'text-xs font-black text-amber-300 pt-1';
+      detailTitle.textContent = '⚔️ 兩兩捉對逐墩明細';
+      body.appendChild(detailTitle);
+
+      const sortedPairs = result.pairwise.slice().sort((a, b) => {
+        const aMe = (a.i === myIdx || a.j === myIdx) ? 0 : 1;
+        const bMe = (b.i === myIdx || b.j === myIdx) ? 0 : 1;
+        return aMe - bMe;
+      });
+
+      sortedPairs.forEach(p => {
+        const pA = appState.seats[p.i].name;
+        const pB = appState.seats[p.j].name;
+        const isMine = (p.i === myIdx || p.j === myIdx);
+        const item = document.createElement('div');
+        item.className = `p-2.5 rounded-xl border text-xs space-y-1 ${
+          isMine ? 'bg-emerald-900/50 border-amber-400/50' : 'bg-black/30 border-amber-500/20'
+        }`;
+
+        const fmt = (n) => n > 0 ? `+${n}` : `${n}`;
+        const laneInfo = p.type === 'special' || p.type === 'foul_both'
+          ? `<span class="text-amber-200">${p.note}</span>`
+          : `頭(${fmt(p.fDiff)}) / 中(${fmt(p.mDiff)}) / 尾(${fmt(p.bDiff)})・<span class="text-amber-200">${p.note}</span>`;
+
+        item.innerHTML = `
+          <div class="flex items-center justify-between font-bold">
+            <span class="text-white">${pA} <span class="text-amber-400">VS</span> ${pB}</span>
+            <span class="font-mono font-black ${p.netA > 0 ? 'text-amber-300' : p.netA < 0 ? 'text-red-300' : 'text-slate-300'}">
+              ${pA} ${fmt(p.netA)} 水
+            </span>
+          </div>
+          <div class="text-[11px] text-emerald-200/80">${laneInfo}</div>
+        `;
+        body.appendChild(item);
+      });
+
+      // Next round button state for guest vs host
+      const nextBtn = document.getElementById('btn-next-round');
+      if (appState.mode === 'guest') {
+        nextBtn.disabled = true;
+        nextBtn.textContent = '等待房主開啟下一局...';
+      } else {
+        nextBtn.disabled = false;
+        nextBtn.textContent = '確定 / 再來一局 🎴';
+      }
+
+      document.getElementById('settlement-modal').classList.remove('hidden');
+      if (myDelta > 0) audioEngine.playSfx('win');
+    }
+
+    function startNextRound() {
+      if (appState.mode === 'guest') return;
+      document.getElementById('settlement-modal').classList.add('hidden');
+      startNewRoundAsHost();
+    }
+
+    function leaveToLobby() {
+      if (appState.timerHandle) {
+        clearInterval(appState.timerHandle);
+        appState.timerHandle = null;
+      }
+      document.getElementById('settlement-modal').classList.add('hidden');
+      document.getElementById('game-screen').classList.add('hidden');
+      document.getElementById('game-screen').classList.remove('flex');
+      document.getElementById('lobby-screen').classList.remove('hidden');
+      appState.phase = 'lobby';
+      renderLobbySeats();
+    }
+
+    /* =========================================================================
+       9. INITIALIZATION & URL ?room= AUTO-FILL
+       ========================================================================= */
+    window.addEventListener('DOMContentLoaded', () => {
+      renderLobbySeats();
+
+      // Check URL ?room=XXXX parameter
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const roomParam = params.get('room');
+        if (roomParam) {
+          document.getElementById('join-room-input').value = roomParam.trim();
+          showToast(`已自動帶入房號 ${roomParam}，請點擊「加入房間」`, 'info');
+        }
+      } catch (e) {}
+
+      // Preload TTS voices if supported
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.getVoices();
+      }
+    });
+  </script>
+</body>
+</html>
